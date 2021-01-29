@@ -1,0 +1,8 @@
+napari[full]
+napari-aicsimageio
+napari-imc>=0.3.4
+napari-plugin-engine>=0.1.4
+numpy
+pandas
+qtpy
+scikit-image

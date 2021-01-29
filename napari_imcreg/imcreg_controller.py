@@ -1,0 +1,467 @@
+import numpy as np
+import pandas as pd
+import re
+
+from napari.layers import Image, Points
+from napari.layers.utils.text import TextManager
+from napari_imc import IMCController
+from napari_imc.models import IMCFileModel
+from pathlib import Path
+from skimage.transform import estimate_transform
+from typing import Callable, List, Optional, Tuple, Union
+
+from napari_imcreg.widgets import RegistrationDialog, RegistrationWidget
+
+
+class IMCRegControllerException(Exception):
+    pass
+
+
+class IMCRegController:
+    MATCH_ALPHABETICAL = 'alphabetical'
+    MATCH_FILENAME = 'filename'
+    MATCH_REGEX = 'regex'
+
+    EUCLIDEAN_TRANSFORM = 'euclidean'
+    SIMILARITY_TRANSFORM = 'similarity'
+    AFFINE_TRANSFORM = 'affine'
+
+    class ViewController:
+        _points_layer_args = {
+            'properties': {'id': np.arange(1, 1000)},  # see https://github.com/napari/napari/issues/2115
+            'text': {'text': 'id', 'anchor': 'upper_left', 'color': 'red', 'translation': (0, 20)},
+            'symbol': 'cross',
+            'edge_width': 0,
+            'face_color': 'red',
+            'name': 'Control points',
+        }
+
+        def __init__(self, controller: 'IMCRegController', imc_controller: IMCController):
+            self._controller = controller
+            self._imc_controller = imc_controller
+            self._widget: Optional[RegistrationWidget] = None
+            self._image_path: Optional[Path] = None
+            self._image_imc_file: Optional[IMCFileModel] = None
+            self._image_layers: List[Image] = []
+            self._points_layer: Optional[Points] = None
+
+        def initialize(self):
+            self._widget = RegistrationWidget(self)
+            self._imc_controller.viewer.window.add_dock_widget(self._widget, name='Control point matching')
+            self._imc_controller.dock_widget.hide()
+
+        def show(self, path: Path):
+            self._close_image()
+            self._remove_points_layer()
+            self._open_image(path)
+            self._add_points_layer()
+
+        def refresh_widget(self):
+            self._widget.refresh()
+
+        @property
+        def image_path(self) -> Optional[Path]:
+            return self._image_path
+
+        @property
+        def control_points(self) -> Optional[pd.DataFrame]:
+            if self._points_layer is not None:
+                return pd.DataFrame(
+                    data=self._points_layer.data,
+                    index=self._points_layer.properties['id'],
+                    columns=['x', 'y']
+                )
+            return None
+
+        @control_points.setter
+        def control_points(self, control_points: pd.DataFrame):
+            if self._points_layer is None:
+                raise RuntimeError('points layer is None')
+            self._points_layer.data = control_points.values
+            properties = self._points_layer.properties
+            properties['id'] = control_points.index.values
+            self._points_layer.properties = properties
+            self._widget.refresh()
+
+        @property
+        def controller(self) -> 'IMCRegController':
+            return self._controller
+
+        def _open_image(self, path: Path):
+            self._image_path = path
+            if path.suffix.lower() in ('.mcd', '.txt'):
+                self._imc_controller.dock_widget.show()
+                self._image_imc_file = self._imc_controller.open_imc_file(path)
+            else:
+                self._imc_controller.dock_widget.hide()
+                self._image_layers = self._imc_controller.viewer.open(str(path), layer_type='image')
+
+        def _close_image(self):
+            self._image_path = None
+            if self._image_imc_file is not None:
+                self._imc_controller.close_imc_file(self._image_imc_file)
+                self._image_imc_file = None
+            while len(self._image_layers) > 0:
+                self._imc_controller.viewer.layers.remove(self._image_layers.pop())
+            self._imc_controller.dock_widget.hide()
+
+        def _add_points_layer(self):
+            # noinspection PyUnresolvedReferences
+            self._points_layer: Points = self._imc_controller.viewer.add_points(**self._points_layer_args)
+            self._points_layer.mode = 'add'
+
+            @self._points_layer.mouse_drag_callbacks.append
+            def on_points_layer_mouse_drag(layer, _):
+                if layer.mode == 'add':
+                    layer.current_properties['id'][0] = max(layer.properties['id'], default=0) + 1
+
+            @self._points_layer.events.current_properties.connect
+            def on_points_layer_current_properties_changed(_):
+                self._widget.refresh()
+                self._points_layer_text_workaround()
+                self._controller._save_current_control_points()
+                self._controller._save_current_target_coords()
+
+        def _remove_points_layer(self):
+            if self._points_layer is not None:
+                self._imc_controller.viewer.layers.remove(self._points_layer)
+                self._points_layer = None
+
+        # see https://github.com/napari/napari/issues/2115
+        def _points_layer_text_workaround(self):
+            text_args = self._points_layer_args['text']
+            if not isinstance(text_args, dict):
+                text_args = {'text': text_args}
+            n_text = len(self._points_layer.data)
+            self._points_layer._text = TextManager(**text_args, n_text=n_text, properties=self._points_layer.properties)
+            self._points_layer.refresh_text()
+
+    def __init__(self, source_imc_controller: IMCController, target_imc_controller: IMCController):
+        self._source_view_controller = IMCRegController.ViewController(self, source_imc_controller)
+        self._target_view_controller = IMCRegController.ViewController(self, target_imc_controller)
+        self._source_file_paths: Optional[List[Path]] = None
+        self._target_file_paths: Optional[List[Path]] = None
+        self._control_points_file_paths: Optional[List[Path]] = None
+        self._source_coords_file_paths: Optional[List[Path]] = None
+        self._target_coords_file_paths: Optional[List[Path]] = None
+        self._coords_transform_type: Optional[str] = None
+        self._current_index: Optional[int] = None
+        self._current_source_coords: Optional[pd.DataFrame] = None
+
+    def initialize(self):
+        self._source_view_controller.initialize()
+        self._target_view_controller.initialize()
+
+    def show_dialog(self):
+        registration_dialog = RegistrationDialog(self)
+        if registration_dialog.exec() == RegistrationDialog.Accepted:
+            if registration_dialog.selection_mode == RegistrationDialog.SelectionMode.FILE:
+                self.load_file(
+                    registration_dialog.source_path,
+                    registration_dialog.target_path,
+                    registration_dialog.control_points_path,
+                    source_coords_file_path=registration_dialog.source_coords_path,
+                    target_coords_file_path=registration_dialog.target_coords_path,
+                    coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
+                )
+            else:
+                self.load_directory(
+                    self._to_file_matching_strategy(registration_dialog.file_matching_strategy),
+                    registration_dialog.source_path,
+                    registration_dialog.target_path,
+                    registration_dialog.control_points_path,
+                    source_coords_dir_path=registration_dialog.source_coords_path,
+                    target_coords_dir_path=registration_dialog.target_coords_path,
+                    coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
+                    source_regex=registration_dialog.source_regex,
+                    target_regex=registration_dialog.target_regex,
+                    source_coords_regex=registration_dialog.source_coords_regex,
+                )
+            return True
+        return False
+
+    def load_file(
+            self,
+            source_file_path: Union[str, Path],
+            target_file_path: Union[str, Path],
+            control_points_file_path: Union[str, Path],
+            source_coords_file_path: Union[str, Path, None] = None,
+            target_coords_file_path: Union[str, Path, None] = None,
+            coords_transform_type: Optional[str] = None,
+    ):
+        self._source_file_paths = [Path(source_file_path)]
+        self._target_file_paths = [Path(target_file_path)]
+        self._control_points_file_paths = [Path(control_points_file_path)]
+        self._source_coords_file_paths = None
+        if source_coords_file_path is not None:
+            self._source_coords_file_paths = [Path(source_coords_file_path)]
+        self._target_coords_file_paths = None
+        if target_coords_file_path is not None:
+            self._target_coords_file_paths = [Path(target_coords_file_path)]
+        self._coords_transform_type = coords_transform_type
+        self._current_index = 0
+
+    def load_directory(
+            self,
+            file_matching_strategy: str,
+            source_dir_path: Union[str, Path],
+            target_dir_path: Union[str, Path],
+            control_points_dir_path: Union[str, Path],
+            source_coords_dir_path: Optional[Union[str, Path]] = None,
+            target_coords_dir_path: Optional[Union[str, Path]] = None,
+            coords_transform_type: Optional[str] = None,
+            source_regex: Optional[str] = None,
+            target_regex: Optional[str] = None,
+            source_coords_regex: Optional[str] = None,
+    ):
+        source_dir_path = Path(source_dir_path)
+        target_dir_path = Path(target_dir_path)
+        control_points_dir_path = Path(control_points_dir_path)
+        source_coords_dir_path = Path(source_coords_dir_path) if source_coords_dir_path is not None else None
+        target_coords_dir_path = Path(target_coords_dir_path) if target_coords_dir_path is not None else None
+        if file_matching_strategy == self.MATCH_ALPHABETICAL:
+            self._source_file_paths, self._target_file_paths, self._source_coords_file_paths = self._match_alphabetical(
+                source_dir_path,
+                target_dir_path,
+                source_coords_dir_path,
+            )
+        elif file_matching_strategy == self.MATCH_FILENAME:
+            self._source_file_paths, self._target_file_paths, self._source_coords_file_paths = self._match_filename(
+                source_dir_path,
+                target_dir_path,
+                source_coords_dir_path,
+            )
+        elif file_matching_strategy == self.MATCH_REGEX:
+            self._source_file_paths, self._target_file_paths, self._source_coords_file_paths = self._match_regex(
+                source_dir_path, source_regex,
+                target_dir_path, target_regex,
+                source_coords_dir_path, source_coords_regex,
+            )
+        else:
+            raise ValueError(f'Unsupported file matching strategy: {file_matching_strategy}')
+        self._control_points_file_paths = [control_points_dir_path / f'{p.stem}.npy' for p in self._target_file_paths]
+        self._target_coords_file_paths = None
+        if target_coords_dir_path is not None:
+            self._target_coords_file_paths = [target_coords_dir_path / f'{p.stem}.csv' for p in self._target_file_paths]
+        self._coords_transform_type = coords_transform_type
+        self._current_index = 0
+
+    def show(self):
+        if self.current_source_coords_file_path is not None:
+            self._load_current_source_coords()
+        else:
+            self._current_source_coords = None
+        self._source_view_controller.show(self.current_source_file_path)
+        self._target_view_controller.show(self.current_target_file_path)
+        if self.current_control_points_file_path.exists():
+            self._load_current_control_points()
+        self._source_view_controller.refresh_widget()
+        self._target_view_controller.refresh_widget()
+
+    def show_prev(self):
+        self._current_index = (self._current_index - 1) % len(self._source_file_paths)
+        self.show()
+
+    def show_next(self):
+        self._current_index = (self._current_index + 1) % len(self._source_file_paths)
+        self.show()
+
+    @property
+    def current_source_file_path(self) -> Optional[Path]:
+        if self._current_index is not None:
+            return self._source_file_paths[self._current_index]
+        return None
+
+    @property
+    def current_target_file_path(self) -> Optional[Path]:
+        if self._current_index is not None:
+            return self._target_file_paths[self._current_index]
+        return None
+
+    @property
+    def current_control_points_file_path(self) -> Optional[Path]:
+        if self._current_index is not None:
+            return self._control_points_file_paths[self._current_index]
+        return None
+
+    @property
+    def current_source_coords_file_path(self) -> Optional[Path]:
+        if self._current_index is not None and self._source_coords_file_paths is not None:
+            return self._source_coords_file_paths[self._current_index]
+        return None
+
+    @property
+    def current_target_coords_file_path(self) -> Optional[Path]:
+        if self._current_index is not None and self._target_coords_file_paths is not None:
+            return self._target_coords_file_paths[self._current_index]
+        return None
+
+    @property
+    def current_control_points(self) -> Optional[pd.DataFrame]:
+        source_control_points = self._source_view_controller.control_points
+        target_control_points = self._target_view_controller.control_points
+        if source_control_points is not None and target_control_points is not None:
+            return pd.merge(
+                source_control_points, target_control_points,
+                left_index=True, right_index=True, suffixes=('_source', '_target')
+            )
+        return None
+
+    @staticmethod
+    def _match_alphabetical(
+            source_dir_path: Path,
+            target_dir_path: Path,
+            source_coords_dir_path: Optional[Path],
+    ) -> Tuple[List[Path], List[Path], List[Path]]:
+        source_file_paths = sorted(filter(lambda p: p.is_file(), source_dir_path.iterdir()), key=lambda p: p.stem)
+        target_file_paths = sorted(filter(lambda p: p.is_file(), target_dir_path.iterdir()), key=lambda p: p.stem)
+        if len(target_file_paths) != len(source_file_paths):
+            raise IMCRegControllerException('Number of target images does not match the number of source images')
+        source_coords_file_paths = None
+        if source_coords_dir_path is not None:
+            source_coords_file_paths = sorted(
+                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir())
+            )
+            if len(source_coords_file_paths) != len(source_file_paths):
+                raise IMCRegControllerException('Number of coordinate files does not match the number of source images')
+        return source_file_paths, target_file_paths, source_coords_file_paths
+
+    @classmethod
+    def _match_filename(
+            cls,
+            source_dir_path: Path,
+            target_dir_path: Path,
+            source_coords_dir_path: Optional[Path],
+    ) -> Tuple[List[Path], List[Path], List[Path]]:
+        def match_target(target_file_path: Path, source_file_path: Path):
+            return target_file_path.stem == source_file_path.stem
+
+        def match_source_coords(source_coords_file_path: Path, source_file_path: Path):
+            return source_coords_file_path.stem == source_file_path.stem
+
+        return cls._match(source_dir_path, target_dir_path, match_target, source_coords_dir_path, match_source_coords)
+
+    @classmethod
+    def _match_regex(
+            cls,
+            source_dir_path: Path, source_regex: str,
+            target_dir_path: Path, target_regex: str,
+            source_coords_dir_path: Optional[Path], source_coords_regex: Optional[str],
+    ) -> Tuple[List[Path], List[Path], List[Path]]:
+        source_regex_compiled = re.compile(source_regex)
+        target_regex_compiled = re.compile(target_regex)
+        source_coords_regex_compiled = re.compile(source_coords_regex)
+
+        def match_target(target_file_path: Path, source_file_path: Path):
+            target_match = target_regex_compiled.search(target_file_path.name)
+            source_match = source_regex_compiled.search(source_file_path.name)
+            if target_match is not None and source_match is not None:
+                return target_match.group() == source_match.group()
+            return False
+
+        def match_source_coords(source_coords_file_path: Path, source_file_path: Path):
+            source_coords_match = source_coords_regex_compiled.search(source_coords_file_path.name)
+            source_match = source_regex_compiled.search(source_file_path.name)
+            if source_coords_match is not None and source_match is not None:
+                return source_coords_match.group() == source_match.group()
+            return False
+
+        return cls._match(source_dir_path, target_dir_path, match_target, source_coords_dir_path, match_source_coords)
+
+    @staticmethod
+    def _match(
+            source_dir_path: Path,
+            target_dir_path: Path, target_criterion: Callable[[Path, Path], bool],
+            source_coords_dir_path: Optional[Path], source_coords_criterion: Optional[Callable[[Path, Path], bool]]
+    ) -> Tuple[List[Path], List[Path], List[Path]]:
+        source_file_paths = list(filter(lambda p: p.is_file(), source_dir_path.iterdir()))
+        target_file_paths = list(filter(lambda p: p.is_file(), target_dir_path.iterdir()))
+        source_coords_file_paths = None
+        if source_coords_dir_path is not None:
+            source_coords_file_paths = list(
+                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir())
+            )
+        matched_source_file_paths = []
+        matched_target_file_paths = []
+        matched_source_coords_file_paths = None
+        if source_coords_file_paths is not None:
+            matched_source_coords_file_paths = []
+        for matched_source_file_path in source_file_paths:
+            matched_target_file_path = next(
+                (p for p in target_file_paths if target_criterion(p, matched_source_file_path)),
+                None
+            )
+            if matched_target_file_path is None:
+                continue
+            matched_source_coords_file_path = None
+            if source_coords_file_paths is not None:
+                matched_source_coords_file_path = next(
+                    (p for p in source_coords_file_paths if source_coords_criterion(p, matched_source_file_path)),
+                    None
+                )
+                if matched_source_coords_file_path is None:
+                    continue
+            matched_source_file_paths.append(matched_source_file_path)
+            matched_target_file_paths.append(matched_target_file_path)
+            if matched_source_coords_file_paths is not None:
+                matched_source_coords_file_paths.append(matched_source_coords_file_path)
+        return matched_source_file_paths, matched_target_file_paths, matched_source_coords_file_paths
+
+    def _load_current_control_points(self):
+        control_points = pd.read_csv(self.current_control_points_file_path)
+        source_control_points = control_points.loc[:, ['x_source', 'y_source']]
+        target_control_points = control_points.loc[:, ['x_target', 'y_target']]
+        source_control_points.columns = ['x', 'y']
+        target_control_points.columns = ['x', 'y']
+        self._source_view_controller.control_points = source_control_points
+        self._target_view_controller.control_points = target_control_points
+
+    def _save_current_control_points(self):
+        self.current_control_points.to_csv(self.current_control_points_file_path, index=False)
+
+    def _load_current_source_coords(self):
+        self._current_source_coords = pd.read_csv(self.current_source_coords_file_path)
+
+    def _estimate_current_transform(self):
+        if self._coords_transform_type == self.EUCLIDEAN_TRANSFORM:
+            transform_type = 'euclidean'
+        elif self._coords_transform_type == self.SIMILARITY_TRANSFORM:
+            transform_type = 'similarity'
+        elif self._coords_transform_type == self.AFFINE_TRANSFORM:
+            transform_type = 'affine'
+        else:
+            raise ValueError(f'Unsupported coordinate transform type: {self._coords_transform_type}')
+        current_control_points = self.current_control_points
+        if current_control_points.shape[0] >= 3:
+            src = current_control_points.loc[:, ['x_source', 'y_source']].values
+            dst = current_control_points.loc[:, ['x_target', 'y_target']].values
+            return estimate_transform(transform_type, src, dst)
+        return None
+
+    def _save_current_target_coords(self):
+        if self._current_source_coords is not None:
+            transform = self._estimate_current_transform()
+            if transform is not None:
+                current_target_coords = self._current_source_coords.copy()
+                current_target_coords.loc[:, ['X', 'Y']] = transform(self._current_source_coords.loc[:, ['X', 'Y']])
+                current_target_coords.to_csv(self.current_target_coords_file_path, index=False)
+
+    @classmethod
+    def _to_file_matching_strategy(cls, file_matching_strategy: RegistrationDialog.FileMatchingStrategy) -> str:
+        if file_matching_strategy == RegistrationDialog.FileMatchingStrategy.ALPHABETICAL:
+            return cls.MATCH_ALPHABETICAL
+        if file_matching_strategy == RegistrationDialog.FileMatchingStrategy.FILENAME:
+            return cls.MATCH_FILENAME
+        if file_matching_strategy == RegistrationDialog.FileMatchingStrategy.REGEX:
+            return cls.MATCH_REGEX
+        raise ValueError('Unsupported file matching strategy')
+
+    @classmethod
+    def _to_coords_transform_type(cls, coords_transform_type: RegistrationDialog.CoordinateTransformType) -> str:
+        if coords_transform_type == RegistrationDialog.CoordinateTransformType.EUCLIDEAN:
+            return cls.EUCLIDEAN_TRANSFORM
+        if coords_transform_type == RegistrationDialog.CoordinateTransformType.SIMILARITY:
+            return cls.SIMILARITY_TRANSFORM
+        if coords_transform_type == RegistrationDialog.CoordinateTransformType.AFFINE:
+            return cls.AFFINE_TRANSFORM
+        raise ValueError('Unsupported coordinate transform type')
