@@ -274,7 +274,8 @@ class IMCRegController:
         source_coords_file_paths = None
         if source_coords_dir_path is not None:
             source_coords_file_paths = sorted(
-                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir())
+                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir()),
+                key=lambda p: p.stem
             )
             if len(source_coords_file_paths) != len(source_file_paths):
                 raise IMCRegControllerException('Number of coordinate files does not match the number of source images')

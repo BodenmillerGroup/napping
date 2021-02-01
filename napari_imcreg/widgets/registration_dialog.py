@@ -1,6 +1,7 @@
 from enum import Enum, IntEnum
 from pathlib import Path
 from typing import Optional, TYPE_CHECKING, Union
+from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -118,6 +119,9 @@ class RegistrationDialog(QDialog):
 
         required_group_box = QGroupBox(self)
         required_group_box_layout = QFormLayout()
+        required_group_box_layout.setLabelAlignment(Qt.AlignLeft)
+        required_group_box_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        required_group_box_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         required_group_box_layout.addRow('Source image(s):', self._source_file_line_edit)
         required_group_box_layout.addRow(self._source_regex_label, self._source_regex_line_edit)
         required_group_box_layout.addRow('Target image(s):', self._target_file_line_edit)
@@ -128,6 +132,9 @@ class RegistrationDialog(QDialog):
 
         optional_group_box = QGroupBox(self)
         optional_group_box_layout = QFormLayout()
+        optional_group_box_layout.setLabelAlignment(Qt.AlignLeft)
+        optional_group_box_layout.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        optional_group_box_layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         optional_group_box_layout.addRow('Source coordinates:', self._source_coords_file_line_edit)
         optional_group_box_layout.addRow(self._source_coords_regex_label, self._source_coords_regex_line_edit)
         optional_group_box_layout.addRow('Transformed coord. dest.:', self._transformed_coords_file_line_edit)
