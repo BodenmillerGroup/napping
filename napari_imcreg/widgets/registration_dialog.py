@@ -203,7 +203,6 @@ class RegistrationDialog(QDialog):
 
     @property
     def is_valid(self) -> bool:
-        # TODO check whether paths are identical
         if self.selection_mode == self.SelectionMode.FILE:
             if self.source_path is None or not self.source_path.is_file():
                 return False
