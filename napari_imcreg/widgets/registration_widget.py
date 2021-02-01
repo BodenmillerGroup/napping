@@ -44,6 +44,12 @@ class RegistrationWidget(QWidget):
     def refresh(self):
         path_name = self._view_controller.image_path.name
         num_control_points = self._view_controller.control_points.shape[0]
-        matched_control_points = self._view_controller.controller.current_control_points
-        num_matched_control_points = matched_control_points.shape[0] if matched_control_points is not None else '?'
-        self._status_label.setText(f'{path_name}\n{num_control_points} points ({num_matched_control_points} matched)')
+        text = f'{path_name}\n{num_control_points} points'
+        if self._view_controller.controller.current_transform is not None:
+            num_matched_control_points = self._view_controller.controller.matched_control_points.shape[0]
+            residuals_mean = self._view_controller.controller.current_residuals.mean()
+            text += f' ({num_matched_control_points} matched, residuals mean: {residuals_mean:.2f})'
+        else:
+            text += f' (not enough matching points)'
+        self._status_label.setText(text)
+

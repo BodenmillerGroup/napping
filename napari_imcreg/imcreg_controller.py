@@ -7,7 +7,7 @@ from napari.layers.utils.text import TextManager
 from napari_imc import IMCController
 from napari_imc.models import IMCFileModel
 from pathlib import Path
-from skimage.transform import estimate_transform
+from skimage.transform import estimate_transform, ProjectiveTransform
 from typing import Callable, List, Optional, Tuple, Union
 
 from napari_imcreg.widgets import RegistrationDialog, RegistrationWidget
@@ -26,127 +26,19 @@ class IMCRegController:
     SIMILARITY_TRANSFORM = 'similarity'
     AFFINE_TRANSFORM = 'affine'
 
-    class ViewController:
-        _points_layer_args = {
-            'properties': {'id': np.arange(1, 1000)},  # see https://github.com/napari/napari/issues/2115
-            'text': {'text': 'id', 'anchor': 'upper_left', 'color': 'red', 'translation': (0, 20)},
-            'symbol': 'cross',
-            'edge_width': 0,
-            'face_color': 'red',
-            'name': 'Control points',
-        }
-
-        def __init__(self, controller: 'IMCRegController', imc_controller: IMCController):
-            self._controller = controller
-            self._imc_controller = imc_controller
-            self._widget: Optional[RegistrationWidget] = None
-            self._image_path: Optional[Path] = None
-            self._image_imc_file: Optional[IMCFileModel] = None
-            self._image_layers: List[Image] = []
-            self._points_layer: Optional[Points] = None
-
-        def initialize(self):
-            self._widget = RegistrationWidget(self)
-            self._imc_controller.viewer.window.add_dock_widget(self._widget, name='Control point matching')
-            self._imc_controller.dock_widget.hide()
-
-        def show(self, path: Path):
-            self._close_image()
-            self._remove_points_layer()
-            self._open_image(path)
-            self._add_points_layer()
-
-        def refresh_widget(self):
-            self._widget.refresh()
-
-        @property
-        def image_path(self) -> Optional[Path]:
-            return self._image_path
-
-        @property
-        def control_points(self) -> Optional[pd.DataFrame]:
-            if self._points_layer is not None:
-                return pd.DataFrame(
-                    data=self._points_layer.data,
-                    index=self._points_layer.properties['id'],
-                    columns=['x', 'y']
-                )
-            return None
-
-        @control_points.setter
-        def control_points(self, control_points: pd.DataFrame):
-            if self._points_layer is None:
-                raise RuntimeError('points layer is None')
-            self._points_layer.data = control_points.values
-            properties = self._points_layer.properties
-            properties['id'] = control_points.index.values
-            self._points_layer.properties = properties
-            self._widget.refresh()
-
-        @property
-        def controller(self) -> 'IMCRegController':
-            return self._controller
-
-        def _open_image(self, path: Path):
-            self._image_path = path
-            if path.suffix.lower() in ('.mcd', '.txt'):
-                self._imc_controller.dock_widget.show()
-                self._image_imc_file = self._imc_controller.open_imc_file(path)
-            else:
-                self._imc_controller.dock_widget.hide()
-                self._image_layers = self._imc_controller.viewer.open(str(path), layer_type='image')
-
-        def _close_image(self):
-            self._image_path = None
-            if self._image_imc_file is not None:
-                self._imc_controller.close_imc_file(self._image_imc_file)
-                self._image_imc_file = None
-            while len(self._image_layers) > 0:
-                self._imc_controller.viewer.layers.remove(self._image_layers.pop())
-            self._imc_controller.dock_widget.hide()
-
-        def _add_points_layer(self):
-            # noinspection PyUnresolvedReferences
-            self._points_layer: Points = self._imc_controller.viewer.add_points(**self._points_layer_args)
-            self._points_layer.mode = 'add'
-
-            @self._points_layer.mouse_drag_callbacks.append
-            def on_points_layer_mouse_drag(layer, _):
-                if layer.mode == 'add':
-                    layer.current_properties['id'][0] = max(layer.properties['id'], default=0) + 1
-
-            @self._points_layer.events.current_properties.connect
-            def on_points_layer_current_properties_changed(_):
-                self._widget.refresh()
-                self._points_layer_text_workaround()
-                self._controller._save_current_control_points()
-                self._controller._save_current_target_coords()
-
-        def _remove_points_layer(self):
-            if self._points_layer is not None:
-                self._imc_controller.viewer.layers.remove(self._points_layer)
-                self._points_layer = None
-
-        # see https://github.com/napari/napari/issues/2115
-        def _points_layer_text_workaround(self):
-            text_args = self._points_layer_args['text']
-            if not isinstance(text_args, dict):
-                text_args = {'text': text_args}
-            n_text = len(self._points_layer.data)
-            self._points_layer._text = TextManager(**text_args, n_text=n_text, properties=self._points_layer.properties)
-            self._points_layer.refresh_text()
-
     def __init__(self, source_imc_controller: IMCController, target_imc_controller: IMCController):
-        self._source_view_controller = IMCRegController.ViewController(self, source_imc_controller)
-        self._target_view_controller = IMCRegController.ViewController(self, target_imc_controller)
+        self._source_view_controller = self.ViewController(self, source_imc_controller)
+        self._target_view_controller = self.ViewController(self, target_imc_controller)
         self._source_file_paths: Optional[List[Path]] = None
         self._target_file_paths: Optional[List[Path]] = None
         self._control_points_file_paths: Optional[List[Path]] = None
         self._source_coords_file_paths: Optional[List[Path]] = None
-        self._target_coords_file_paths: Optional[List[Path]] = None
+        self._transformed_coords_file_paths: Optional[List[Path]] = None
         self._coords_transform_type: Optional[str] = None
         self._current_index: Optional[int] = None
+        self._current_transform: Optional[ProjectiveTransform] = None
         self._current_source_coords: Optional[pd.DataFrame] = None
+        self._current_transformed_coords: Optional[pd.DataFrame] = None
 
     def initialize(self):
         self._source_view_controller.initialize()
@@ -161,17 +53,17 @@ class IMCRegController:
                     registration_dialog.target_path,
                     registration_dialog.control_points_path,
                     source_coords_file_path=registration_dialog.source_coords_path,
-                    target_coords_file_path=registration_dialog.target_coords_path,
+                    transformed_coords_file_path=registration_dialog.transformed_coords_path,
                     coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
                 )
             else:
-                self.load_directory(
+                self.load_dir(
                     self._to_file_matching_strategy(registration_dialog.file_matching_strategy),
                     registration_dialog.source_path,
                     registration_dialog.target_path,
                     registration_dialog.control_points_path,
                     source_coords_dir_path=registration_dialog.source_coords_path,
-                    target_coords_dir_path=registration_dialog.target_coords_path,
+                    transformed_coords_dir_path=registration_dialog.transformed_coords_path,
                     coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
                     source_regex=registration_dialog.source_regex,
                     target_regex=registration_dialog.target_regex,
@@ -186,7 +78,7 @@ class IMCRegController:
             target_file_path: Union[str, Path],
             control_points_file_path: Union[str, Path],
             source_coords_file_path: Union[str, Path, None] = None,
-            target_coords_file_path: Union[str, Path, None] = None,
+            transformed_coords_file_path: Union[str, Path, None] = None,
             coords_transform_type: Optional[str] = None,
     ):
         self._source_file_paths = [Path(source_file_path)]
@@ -195,20 +87,21 @@ class IMCRegController:
         self._source_coords_file_paths = None
         if source_coords_file_path is not None:
             self._source_coords_file_paths = [Path(source_coords_file_path)]
-        self._target_coords_file_paths = None
-        if target_coords_file_path is not None:
-            self._target_coords_file_paths = [Path(target_coords_file_path)]
+        self._transformed_coords_file_paths = None
+        if transformed_coords_file_path is not None:
+            self._transformed_coords_file_paths = [Path(transformed_coords_file_path)]
         self._coords_transform_type = coords_transform_type
         self._current_index = 0
+        self._show()
 
-    def load_directory(
+    def load_dir(
             self,
             file_matching_strategy: str,
             source_dir_path: Union[str, Path],
             target_dir_path: Union[str, Path],
             control_points_dir_path: Union[str, Path],
             source_coords_dir_path: Optional[Union[str, Path]] = None,
-            target_coords_dir_path: Optional[Union[str, Path]] = None,
+            transformed_coords_dir_path: Optional[Union[str, Path]] = None,
             coords_transform_type: Optional[str] = None,
             source_regex: Optional[str] = None,
             target_regex: Optional[str] = None,
@@ -217,8 +110,10 @@ class IMCRegController:
         source_dir_path = Path(source_dir_path)
         target_dir_path = Path(target_dir_path)
         control_points_dir_path = Path(control_points_dir_path)
-        source_coords_dir_path = Path(source_coords_dir_path) if source_coords_dir_path is not None else None
-        target_coords_dir_path = Path(target_coords_dir_path) if target_coords_dir_path is not None else None
+        if source_coords_dir_path is not None:
+            source_coords_dir_path = Path(source_coords_dir_path)
+        if transformed_coords_dir_path is not None:
+            transformed_coords_dir_path = Path(transformed_coords_dir_path)
         if file_matching_strategy == self.MATCH_ALPHABETICAL:
             self._source_file_paths, self._target_file_paths, self._source_coords_file_paths = self._match_alphabetical(
                 source_dir_path,
@@ -239,32 +134,57 @@ class IMCRegController:
             )
         else:
             raise ValueError(f'Unsupported file matching strategy: {file_matching_strategy}')
-        self._control_points_file_paths = [control_points_dir_path / f'{p.stem}.npy' for p in self._target_file_paths]
-        self._target_coords_file_paths = None
-        if target_coords_dir_path is not None:
-            self._target_coords_file_paths = [target_coords_dir_path / f'{p.stem}.csv' for p in self._target_file_paths]
+        self._control_points_file_paths = [
+            control_points_dir_path / f'{path.stem}.npy' for path in self._target_file_paths
+        ]
+        self._transformed_coords_file_paths = None
+        if transformed_coords_dir_path is not None:
+            self._transformed_coords_file_paths = [
+                transformed_coords_dir_path / f'{path.stem}.csv' for path in self._target_file_paths
+            ]
         self._coords_transform_type = coords_transform_type
         self._current_index = 0
-
-    def show(self):
-        if self.current_source_coords_file_path is not None:
-            self._load_current_source_coords()
-        else:
-            self._current_source_coords = None
-        self._source_view_controller.show(self.current_source_file_path)
-        self._target_view_controller.show(self.current_target_file_path)
-        if self.current_control_points_file_path.exists():
-            self._load_current_control_points()
-        self._source_view_controller.refresh_widget()
-        self._target_view_controller.refresh_widget()
+        self._show()
 
     def show_prev(self):
         self._current_index = (self._current_index - 1) % len(self._source_file_paths)
-        self.show()
+        self._show()
 
     def show_next(self):
         self._current_index = (self._current_index + 1) % len(self._source_file_paths)
-        self.show()
+        self._show()
+
+    @property
+    def source_view_controller(self) -> 'IMCRegController.ViewController':
+        return self._source_view_controller
+
+    @property
+    def target_view_controller(self) -> 'IMCRegController.ViewController':
+        return self._target_view_controller
+
+    @property
+    def source_file_paths(self) -> Optional[List[Path]]:
+        return self._source_file_paths
+
+    @property
+    def target_file_paths(self) -> Optional[List[Path]]:
+        return self._target_file_paths
+
+    @property
+    def control_points_file_paths(self) -> Optional[List[Path]]:
+        return self._control_points_file_paths
+
+    @property
+    def source_coords_file_paths(self) -> Optional[List[Path]]:
+        return self._source_coords_file_paths
+
+    @property
+    def transformed_coords_file_paths(self) -> Optional[List[Path]]:
+        return self._transformed_coords_file_paths
+
+    @property
+    def coords_transform_type(self) -> Optional[str]:
+        return self._coords_transform_type
 
     @property
     def current_source_file_path(self) -> Optional[Path]:
@@ -291,13 +211,25 @@ class IMCRegController:
         return None
 
     @property
-    def current_target_coords_file_path(self) -> Optional[Path]:
-        if self._current_index is not None and self._target_coords_file_paths is not None:
-            return self._target_coords_file_paths[self._current_index]
+    def current_transformed_coords_file_path(self) -> Optional[Path]:
+        if self._current_index is not None and self._transformed_coords_file_paths is not None:
+            return self._transformed_coords_file_paths[self._current_index]
         return None
 
     @property
-    def current_control_points(self) -> Optional[pd.DataFrame]:
+    def current_source_coords(self) -> Optional[pd.DataFrame]:
+        return self._current_source_coords
+
+    @property
+    def current_transformed_coords(self) -> Optional[pd.DataFrame]:
+        return self._current_transformed_coords
+
+    @property
+    def current_transform(self) -> Optional[ProjectiveTransform]:
+        return self._current_transform
+
+    @property
+    def matched_control_points(self) -> Optional[pd.DataFrame]:
         source_control_points = self._source_view_controller.control_points
         target_control_points = self._target_view_controller.control_points
         if source_control_points is not None and target_control_points is not None:
@@ -306,6 +238,28 @@ class IMCRegController:
                 left_index=True, right_index=True, suffixes=('_source', '_target')
             )
         return None
+
+    @property
+    def current_residuals(self) -> Optional[np.ndarray]:
+        if self._current_transform is not None:
+            matched_control_points = self.matched_control_points
+            if matched_control_points is not None:
+                src = matched_control_points.loc[:, ['x_source', 'y_source']].values
+                dst = matched_control_points.loc[:, ['x_target', 'y_target']].values
+                return self._current_transform.residuals(src, dst)
+        return None
+
+    def _show(self):
+        self._source_view_controller.show(self.current_source_file_path)
+        self._target_view_controller.show(self.current_target_file_path)
+        if self.current_control_points_file_path.is_file():
+            self._load_matched_control_points()
+        if self.current_source_coords_file_path.is_file():
+            self._load_current_source_coords()
+        self._update_current_transform()
+        self._update_current_transformed_coords()
+        self._source_view_controller.refresh()
+        self._target_view_controller.refresh()
 
     @staticmethod
     def _match_alphabetical(
@@ -407,22 +361,34 @@ class IMCRegController:
                 matched_source_coords_file_paths.append(matched_source_coords_file_path)
         return matched_source_file_paths, matched_target_file_paths, matched_source_coords_file_paths
 
-    def _load_current_control_points(self):
-        control_points = pd.read_csv(self.current_control_points_file_path)
-        source_control_points = control_points.loc[:, ['x_source', 'y_source']]
-        target_control_points = control_points.loc[:, ['x_target', 'y_target']]
+    def _handle_control_points_changed(self):
+        self._save_matched_control_points()
+        self._update_current_transform()
+        self._update_current_transformed_coords()
+        if self._current_transformed_coords is not None:
+            self._save_current_transformed_coords()
+        self.source_view_controller.refresh()
+        self.target_view_controller.refresh()
+
+    def _load_matched_control_points(self):
+        matched_control_points = pd.read_csv(self.current_control_points_file_path)
+        source_control_points = matched_control_points.loc[:, ['x_source', 'y_source']]
+        target_control_points = matched_control_points.loc[:, ['x_target', 'y_target']]
         source_control_points.columns = ['x', 'y']
         target_control_points.columns = ['x', 'y']
-        self._source_view_controller.control_points = source_control_points
-        self._target_view_controller.control_points = target_control_points
+        self.source_view_controller.control_points = source_control_points
+        self.target_view_controller.control_points = target_control_points
 
-    def _save_current_control_points(self):
-        self.current_control_points.to_csv(self.current_control_points_file_path, index=False)
+    def _save_matched_control_points(self):
+        self.matched_control_points.to_csv(self.current_control_points_file_path, index=False)
 
     def _load_current_source_coords(self):
         self._current_source_coords = pd.read_csv(self.current_source_coords_file_path)
 
-    def _estimate_current_transform(self):
+    def _save_current_transformed_coords(self):
+        self._current_transformed_coords.to_csv(self.current_transformed_coords_file_path, index=False)
+
+    def _update_current_transform(self):
         if self._coords_transform_type == self.EUCLIDEAN_TRANSFORM:
             transform_type = 'euclidean'
         elif self._coords_transform_type == self.SIMILARITY_TRANSFORM:
@@ -431,20 +397,20 @@ class IMCRegController:
             transform_type = 'affine'
         else:
             raise ValueError(f'Unsupported coordinate transform type: {self._coords_transform_type}')
-        current_control_points = self.current_control_points
-        if current_control_points.shape[0] >= 3:
-            src = current_control_points.loc[:, ['x_source', 'y_source']].values
-            dst = current_control_points.loc[:, ['x_target', 'y_target']].values
-            return estimate_transform(transform_type, src, dst)
-        return None
+        self._current_transform = None
+        matched_control_points = self.matched_control_points
+        if matched_control_points.shape[0] >= 3:
+            src = matched_control_points.loc[:, ['x_source', 'y_source']].values
+            dst = matched_control_points.loc[:, ['x_target', 'y_target']].values
+            self._current_transform = estimate_transform(transform_type, src, dst)
 
-    def _save_current_target_coords(self):
-        if self._current_source_coords is not None:
-            transform = self._estimate_current_transform()
-            if transform is not None:
-                current_target_coords = self._current_source_coords.copy()
-                current_target_coords.loc[:, ['X', 'Y']] = transform(self._current_source_coords.loc[:, ['X', 'Y']])
-                current_target_coords.to_csv(self.current_target_coords_file_path, index=False)
+    def _update_current_transformed_coords(self):
+        if self._current_source_coords is not None and self._current_transform is not None:
+            data = self._current_source_coords.loc[:, ['X', 'Y']].values
+            self._current_transformed_coords = self._current_source_coords.copy()
+            self._current_transformed_coords.loc[:, ['X', 'Y']] = self._current_transform(data)
+        else:
+            self._current_transformed_coords = None
 
     @classmethod
     def _to_file_matching_strategy(cls, file_matching_strategy: RegistrationDialog.FileMatchingStrategy) -> str:
@@ -465,3 +431,131 @@ class IMCRegController:
         if coords_transform_type == RegistrationDialog.CoordinateTransformType.AFFINE:
             return cls.AFFINE_TRANSFORM
         raise ValueError('Unsupported coordinate transform type')
+
+    class ViewController:
+        _points_layer_args = {
+            'properties': {'id': np.arange(1, 1000)},  # see https://github.com/napari/napari/issues/2115
+            'text': {'text': 'id', 'anchor': 'upper_left', 'color': 'red', 'translation': (0, 20)},
+            'symbol': 'cross',
+            'edge_width': 0,
+            'face_color': 'red',
+            'name': 'Control points',
+        }
+
+        def __init__(self, controller: 'IMCRegController', imc_controller: IMCController):
+            self._controller = controller
+            self._imc_controller = imc_controller
+            self._widget: Optional[RegistrationWidget] = None
+            self._image_path: Optional[Path] = None
+            self._image_imc_file: Optional[IMCFileModel] = None
+            self._image_layers: List[Image] = []
+            self._points_layer: Optional[Points] = None
+
+        def initialize(self):
+            self._widget = RegistrationWidget(self)
+            self._imc_controller.viewer.window.add_dock_widget(self._widget, name='Control point matching')
+            self._imc_controller.dock_widget.hide()
+
+        def show(self, path: Path):
+            self._close_image()
+            self._remove_points_layer()
+            self._open_image(path)
+            self._add_points_layer()
+
+        def refresh(self):
+            self._widget.refresh()
+
+        @property
+        def controller(self) -> 'IMCRegController':
+            return self._controller
+
+        @property
+        def imc_controller(self) -> IMCController:
+            return self._imc_controller
+
+        @property
+        def widget(self) -> Optional[RegistrationWidget]:
+            return self._widget
+
+        @property
+        def image_path(self) -> Optional[Path]:
+            return self._image_path
+
+        @property
+        def image_imc_file(self) -> Optional[IMCFileModel]:
+            return self._image_imc_file
+
+        @property
+        def image_layers(self) -> List[Image]:
+            return self._image_layers
+
+        @property
+        def points_layer(self) -> Optional[Points]:
+            return self._points_layer
+
+        @property
+        def control_points(self) -> Optional[pd.DataFrame]:
+            if self._points_layer is not None:
+                return pd.DataFrame(
+                    data=self._points_layer.data,
+                    index=self._points_layer.properties['id'],
+                    columns=['x', 'y']
+                )
+            return None
+
+        @control_points.setter
+        def control_points(self, control_points: pd.DataFrame):
+            if self._points_layer is None:
+                raise RuntimeError('points layer is None')
+            self._points_layer.data = control_points.values
+            properties = self._points_layer.properties
+            properties['id'] = control_points.index.values
+            self._points_layer.properties = properties
+            self._widget.refresh()
+
+        def _open_image(self, path: Path):
+            self._image_path = path
+            if path.suffix.lower() in ('.mcd', '.txt'):
+                self._imc_controller.dock_widget.show()
+                self._image_imc_file = self._imc_controller.open_imc_file(path)
+            else:
+                self._imc_controller.dock_widget.hide()
+                self._image_layers = self._imc_controller.viewer.open(str(path), layer_type='image')
+
+        def _close_image(self):
+            self._image_path = None
+            if self._image_imc_file is not None:
+                self._imc_controller.close_imc_file(self._image_imc_file)
+                self._image_imc_file = None
+            while len(self._image_layers) > 0:
+                self._imc_controller.viewer.layers.remove(self._image_layers.pop())
+            self._imc_controller.dock_widget.hide()
+
+        def _add_points_layer(self):
+            # noinspection PyUnresolvedReferences
+            self._points_layer: Points = self._imc_controller.viewer.add_points(**self._points_layer_args)
+            self._points_layer.mode = 'add'
+
+            @self._points_layer.mouse_drag_callbacks.append
+            def on_points_layer_mouse_drag(layer, _):
+                if layer.mode == 'add':
+                    layer.current_properties['id'][0] = max(layer.properties['id'], default=0) + 1
+
+            @self._points_layer.events.current_properties.connect
+            def on_points_layer_current_properties_changed(_):
+                self._points_layer_text_workaround()
+                self._controller._handle_control_points_changed()
+
+        def _remove_points_layer(self):
+            if self._points_layer is not None:
+                self._imc_controller.viewer.layers.remove(self._points_layer)
+                self._points_layer = None
+
+        # see https://github.com/napari/napari/issues/2115
+        def _points_layer_text_workaround(self):
+            text_args = self._points_layer_args['text']
+            if not isinstance(text_args, dict):
+                text_args = {'text': text_args}
+            n_text = len(self._points_layer.data)
+            self._points_layer._text = TextManager(**text_args, n_text=n_text, properties=self._points_layer.properties)
+            self._points_layer.refresh_text()

@@ -1,14 +1,19 @@
 import napari
 import sys
 
-from PIL import Image
 from napari_imc import IMCController
 from napari_imcreg import IMCRegController, IMCRegControllerException
 from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import QMessageBox
 
+try:
+    from PIL import Image
+except:
+    Image = None
+
 # fix DecompressionBombWarning for large images
-Image.MAX_IMAGE_PIXELS = None
+if Image is not None:
+    Image.MAX_IMAGE_PIXELS = None
 
 
 def main() -> int:
@@ -29,9 +34,7 @@ def main() -> int:
         try:
             controller = IMCRegController(source_imc_controller, target_imc_controller)
             controller.initialize()
-            if controller.show_dialog():
-                controller.show()
-            else:
+            if not controller.show_dialog():
                 close_and_quit()
                 return 1
         except IMCRegControllerException as e:
