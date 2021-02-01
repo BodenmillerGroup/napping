@@ -35,11 +35,12 @@ def main() -> int:
             controller = IMCRegController(source_imc_controller, target_imc_controller)
             controller.initialize()
             if not controller.show_dialog():
+                QMessageBox.critical(source_viewer.window.qt_viewer, 'napari [IMC] Registration',
+                                     'File matching aborted or no matching files found')
                 close_and_quit()
                 return 1
         except IMCRegControllerException as e:
-            # noinspection PyArgumentList
-            QMessageBox.critical(source_viewer.window.qt_viewer, 'IMCReg error', str(e))
+            QMessageBox.critical(source_viewer.window.qt_viewer, 'napari [IMC] Registration', str(e))
             close_and_quit()
             return 1
     return 0

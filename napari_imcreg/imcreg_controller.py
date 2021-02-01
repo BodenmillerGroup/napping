@@ -7,9 +7,11 @@ from napari.layers.utils.text import TextManager
 from napari_imc import IMCController
 from napari_imc.models import IMCFileModel
 from pathlib import Path
+from qtpy.QtCore import QCoreApplication
 from skimage.transform import estimate_transform, ProjectiveTransform
 from typing import Callable, List, Optional, Tuple, Union
 
+from napari_imcreg.utils import iter_files
 from napari_imcreg.widgets import RegistrationDialog, RegistrationWidget
 
 
@@ -34,42 +36,43 @@ class IMCRegController:
         self._control_points_file_paths: Optional[List[Path]] = None
         self._source_coords_file_paths: Optional[List[Path]] = None
         self._transformed_coords_file_paths: Optional[List[Path]] = None
-        self._coords_transform_type: Optional[str] = None
+        self._coord_transform_type: Optional[str] = None
         self._current_index: Optional[int] = None
         self._current_transform: Optional[ProjectiveTransform] = None
         self._current_source_coords: Optional[pd.DataFrame] = None
         self._current_transformed_coords: Optional[pd.DataFrame] = None
 
     def initialize(self):
+        QCoreApplication.setOrganizationName('Bodenmiller Lab')
+        QCoreApplication.setOrganizationDomain('bodenmillerlab.com')
+        QCoreApplication.setApplicationName('napari-imcreg')
         self._source_view_controller.initialize()
         self._target_view_controller.initialize()
 
-    def show_dialog(self):
+    def show_dialog(self) -> bool:
         registration_dialog = RegistrationDialog(self)
         if registration_dialog.exec() == RegistrationDialog.Accepted:
             if registration_dialog.selection_mode == RegistrationDialog.SelectionMode.FILE:
-                self.load_file(
+                return self.load_file(
                     registration_dialog.source_path,
                     registration_dialog.target_path,
                     registration_dialog.control_points_path,
                     source_coords_file_path=registration_dialog.source_coords_path,
                     transformed_coords_file_path=registration_dialog.transformed_coords_path,
-                    coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
+                    coord_transform_type=self._to_coord_transform_type(registration_dialog.coord_transform_type),
                 )
-            else:
-                self.load_dir(
-                    self._to_file_matching_strategy(registration_dialog.file_matching_strategy),
-                    registration_dialog.source_path,
-                    registration_dialog.target_path,
-                    registration_dialog.control_points_path,
-                    source_coords_dir_path=registration_dialog.source_coords_path,
-                    transformed_coords_dir_path=registration_dialog.transformed_coords_path,
-                    coords_transform_type=self._to_coords_transform_type(registration_dialog.coords_transform_type),
-                    source_regex=registration_dialog.source_regex,
-                    target_regex=registration_dialog.target_regex,
-                    source_coords_regex=registration_dialog.source_coords_regex,
-                )
-            return True
+            return self.load_dir(
+                self._to_file_matching_strategy(registration_dialog.file_matching_strategy),
+                registration_dialog.source_path,
+                registration_dialog.target_path,
+                registration_dialog.control_points_path,
+                source_coords_dir_path=registration_dialog.source_coords_path,
+                transformed_coords_dir_path=registration_dialog.transformed_coords_path,
+                coord_transform_type=self._to_coord_transform_type(registration_dialog.coord_transform_type),
+                source_regex=registration_dialog.source_regex,
+                target_regex=registration_dialog.target_regex,
+                source_coords_regex=registration_dialog.source_coords_regex,
+            )
         return False
 
     def load_file(
@@ -79,8 +82,8 @@ class IMCRegController:
             control_points_file_path: Union[str, Path],
             source_coords_file_path: Union[str, Path, None] = None,
             transformed_coords_file_path: Union[str, Path, None] = None,
-            coords_transform_type: Optional[str] = None,
-    ):
+            coord_transform_type: Optional[str] = None,
+    ) -> bool:
         self._source_file_paths = [Path(source_file_path)]
         self._target_file_paths = [Path(target_file_path)]
         self._control_points_file_paths = [Path(control_points_file_path)]
@@ -90,9 +93,9 @@ class IMCRegController:
         self._transformed_coords_file_paths = None
         if transformed_coords_file_path is not None:
             self._transformed_coords_file_paths = [Path(transformed_coords_file_path)]
-        self._coords_transform_type = coords_transform_type
+        self._coord_transform_type = coord_transform_type
         self._current_index = 0
-        self._show()
+        return self._show()
 
     def load_dir(
             self,
@@ -102,11 +105,11 @@ class IMCRegController:
             control_points_dir_path: Union[str, Path],
             source_coords_dir_path: Optional[Union[str, Path]] = None,
             transformed_coords_dir_path: Optional[Union[str, Path]] = None,
-            coords_transform_type: Optional[str] = None,
+            coord_transform_type: Optional[str] = None,
             source_regex: Optional[str] = None,
             target_regex: Optional[str] = None,
             source_coords_regex: Optional[str] = None,
-    ):
+    ) -> bool:
         source_dir_path = Path(source_dir_path)
         target_dir_path = Path(target_dir_path)
         control_points_dir_path = Path(control_points_dir_path)
@@ -142,17 +145,17 @@ class IMCRegController:
             self._transformed_coords_file_paths = [
                 transformed_coords_dir_path / f'{path.stem}.csv' for path in self._target_file_paths
             ]
-        self._coords_transform_type = coords_transform_type
+        self._coord_transform_type = coord_transform_type
         self._current_index = 0
-        self._show()
+        return self._show()
 
-    def show_prev(self):
+    def show_prev(self) -> bool:
         self._current_index = (self._current_index - 1) % len(self._source_file_paths)
-        self._show()
+        return self._show()
 
-    def show_next(self):
+    def show_next(self) -> bool:
         self._current_index = (self._current_index + 1) % len(self._source_file_paths)
-        self._show()
+        return self._show()
 
     @property
     def source_view_controller(self) -> 'IMCRegController.ViewController':
@@ -183,8 +186,8 @@ class IMCRegController:
         return self._transformed_coords_file_paths
 
     @property
-    def coords_transform_type(self) -> Optional[str]:
-        return self._coords_transform_type
+    def coord_transform_type(self) -> Optional[str]:
+        return self._coord_transform_type
 
     @property
     def current_source_file_path(self) -> Optional[Path]:
@@ -249,17 +252,20 @@ class IMCRegController:
                 return self._current_transform.residuals(src, dst)
         return None
 
-    def _show(self):
-        self._source_view_controller.show(self.current_source_file_path)
-        self._target_view_controller.show(self.current_target_file_path)
-        if self.current_control_points_file_path.is_file():
-            self._load_matched_control_points()
-        if self.current_source_coords_file_path.is_file():
-            self._load_current_source_coords()
-        self._update_current_transform()
-        self._update_current_transformed_coords()
-        self._source_view_controller.refresh()
-        self._target_view_controller.refresh()
+    def _show(self) -> bool:
+        if 0 <= self._current_index < len(self._source_file_paths):
+            self._source_view_controller.show(self.current_source_file_path)
+            self._target_view_controller.show(self.current_target_file_path)
+            if self.current_control_points_file_path.is_file():
+                self._load_matched_control_points()
+            if self.current_source_coords_file_path is not None and self.current_source_coords_file_path.is_file():
+                self._load_current_source_coords()
+            self._update_current_transform()
+            self._update_current_transformed_coords()
+            self._source_view_controller.refresh()
+            self._target_view_controller.refresh()
+            return True
+        return False
 
     @staticmethod
     def _match_alphabetical(
@@ -267,16 +273,13 @@ class IMCRegController:
             target_dir_path: Path,
             source_coords_dir_path: Optional[Path],
     ) -> Tuple[List[Path], List[Path], List[Path]]:
-        source_file_paths = sorted(filter(lambda p: p.is_file(), source_dir_path.iterdir()), key=lambda p: p.stem)
-        target_file_paths = sorted(filter(lambda p: p.is_file(), target_dir_path.iterdir()), key=lambda p: p.stem)
+        source_file_paths = sorted(iter_files(source_dir_path), key=lambda p: p.stem)
+        target_file_paths = sorted(iter_files(target_dir_path), key=lambda p: p.stem)
         if len(target_file_paths) != len(source_file_paths):
             raise IMCRegControllerException('Number of target images does not match the number of source images')
         source_coords_file_paths = None
         if source_coords_dir_path is not None:
-            source_coords_file_paths = sorted(
-                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir()),
-                key=lambda p: p.stem
-            )
+            source_coords_file_paths = sorted(iter_files(source_coords_dir_path, suffix='.csv'), key=lambda p: p.stem)
             if len(source_coords_file_paths) != len(source_file_paths):
                 raise IMCRegControllerException('Number of coordinate files does not match the number of source images')
         return source_file_paths, target_file_paths, source_coords_file_paths
@@ -329,13 +332,11 @@ class IMCRegController:
             target_dir_path: Path, target_criterion: Callable[[Path, Path], bool],
             source_coords_dir_path: Optional[Path], source_coords_criterion: Optional[Callable[[Path, Path], bool]]
     ) -> Tuple[List[Path], List[Path], List[Path]]:
-        source_file_paths = list(filter(lambda p: p.is_file(), source_dir_path.iterdir()))
-        target_file_paths = list(filter(lambda p: p.is_file(), target_dir_path.iterdir()))
+        source_file_paths = list(iter_files(source_dir_path))
+        target_file_paths = list(iter_files(target_dir_path))
         source_coords_file_paths = None
         if source_coords_dir_path is not None:
-            source_coords_file_paths = list(
-                filter(lambda p: p.is_file() and p.suffix.lower() == '.csv', source_coords_dir_path.iterdir())
-            )
+            source_coords_file_paths = list(iter_files(source_coords_dir_path, suffix='.csv'))
         matched_source_file_paths = []
         matched_target_file_paths = []
         matched_source_coords_file_paths = None
@@ -390,14 +391,14 @@ class IMCRegController:
         self._current_transformed_coords.to_csv(self.current_transformed_coords_file_path, index=False)
 
     def _update_current_transform(self):
-        if self._coords_transform_type == self.EUCLIDEAN_TRANSFORM:
+        if self._coord_transform_type == self.EUCLIDEAN_TRANSFORM:
             transform_type = 'euclidean'
-        elif self._coords_transform_type == self.SIMILARITY_TRANSFORM:
+        elif self._coord_transform_type == self.SIMILARITY_TRANSFORM:
             transform_type = 'similarity'
-        elif self._coords_transform_type == self.AFFINE_TRANSFORM:
+        elif self._coord_transform_type == self.AFFINE_TRANSFORM:
             transform_type = 'affine'
         else:
-            raise ValueError(f'Unsupported coordinate transform type: {self._coords_transform_type}')
+            raise ValueError(f'Unsupported coordinate transform type: {self._coord_transform_type}')
         self._current_transform = None
         matched_control_points = self.matched_control_points
         if matched_control_points.shape[0] >= 3:
@@ -424,12 +425,12 @@ class IMCRegController:
         raise ValueError('Unsupported file matching strategy')
 
     @classmethod
-    def _to_coords_transform_type(cls, coords_transform_type: RegistrationDialog.CoordinateTransformType) -> str:
-        if coords_transform_type == RegistrationDialog.CoordinateTransformType.EUCLIDEAN:
+    def _to_coord_transform_type(cls, coord_transform_type: RegistrationDialog.CoordinateTransformType) -> str:
+        if coord_transform_type == RegistrationDialog.CoordinateTransformType.EUCLIDEAN:
             return cls.EUCLIDEAN_TRANSFORM
-        if coords_transform_type == RegistrationDialog.CoordinateTransformType.SIMILARITY:
+        if coord_transform_type == RegistrationDialog.CoordinateTransformType.SIMILARITY:
             return cls.SIMILARITY_TRANSFORM
-        if coords_transform_type == RegistrationDialog.CoordinateTransformType.AFFINE:
+        if coord_transform_type == RegistrationDialog.CoordinateTransformType.AFFINE:
             return cls.AFFINE_TRANSFORM
         raise ValueError('Unsupported coordinate transform type')
 
