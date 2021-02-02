@@ -1,12 +1,12 @@
-# napari-imcreg
+# napping
 
-[![License](https://img.shields.io/pypi/l/napari-imcreg.svg?color=green)](https://github.com/BodenmillerGroup/napari-imcreg/raw/master/LICENSE)
-[![PyPI](https://img.shields.io/pypi/v/napari-imcreg.svg?color=green)](https://pypi.org/project/napari-imcreg)
-[![Python Version](https://img.shields.io/pypi/pyversions/napari-imcreg.svg?color=green)](https://python.org)
-<!-- [![tests](https://github.com/BodenmillerGroup/napari-imcreg/workflows/tests/badge.svg)](https://github.com/BodenmillerGroup/napari-imcreg/actions) -->
-<!-- [![codecov](https://codecov.io/gh/BodenmillerGroup/napari-imcreg/branch/master/graph/badge.svg)](https://codecov.io/gh/BodenmillerGroup/napari-imcreg) -->
+[![License](https://img.shields.io/pypi/l/napping.svg?color=green)](https://github.com/BodenmillerGroup/napping/raw/master/LICENSE)
+[![PyPI](https://img.shields.io/pypi/v/napping.svg?color=green)](https://pypi.org/project/napping)
+[![Python Version](https://img.shields.io/pypi/pyversions/napping.svg?color=green)](https://python.org)
+<!-- [![tests](https://github.com/BodenmillerGroup/napping/workflows/tests/badge.svg)](https://github.com/BodenmillerGroup/napping/actions) -->
+<!-- [![codecov](https://codecov.io/gh/BodenmillerGroup/napping/branch/master/graph/badge.svg)](https://codecov.io/gh/BodenmillerGroup/napping) -->
 
-Control point-based coordinate transformation for Imaging Mass Cytometry (IMC)
+Control point mapping and coordination transformation using napari
 
 ----------------------------------
 
@@ -22,20 +22,15 @@ https://napari.org/docs/plugins/index.html
 
 ## Installation
 
-You can install `napari-imcreg` via [pip]:
-```shell
-pip install napari-imcreg
-```
+You can install `napping` via [pip]:
 
-As napari is in active development, the use of virtual environments is strongly recommended.
+    pip install napping
 
 ## Usage
 
-To start `napari-imcreg` from command line:
+To start `napping` from command line:
 
-```shell
-napari-imcreg
-```
+    napping
 
 ## Contributing
 
@@ -45,7 +40,7 @@ the coverage at least stays the same before you submit a pull request.
 ## License
 
 Distributed under the terms of the [MIT] license,
-"napari-imcreg" is free and open source software
+"napping" is free and open source software
 
 ## Issues
 
@@ -61,7 +56,7 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 [Apache Software License 2.0]: http://www.apache.org/licenses/LICENSE-2.0
 [Mozilla Public License 2.0]: https://www.mozilla.org/media/MPL/2.0/index.txt
 [cookiecutter-napari-plugin]: https://github.com/napari/cookiecutter-napari-plugin
-[file an issue]: https://github.com/BodenmillerGroup/napari-imcreg/issues
+[file an issue]: https://github.com/BodenmillerGroup/napping/issues
 [napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
 [pip]: https://pypi.org/project/pip/

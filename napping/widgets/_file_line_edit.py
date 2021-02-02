@@ -1,10 +1,10 @@
 from pathlib import Path
-from qtpy.QtWidgets import QFileDialog, QLineEdit, QStyle
+from qtpy.QtWidgets import QFileDialog, QLineEdit, QStyle, QWidget
 from typing import Optional
 
 
 class FileLineEdit(QLineEdit):
-    def __init__(self, check_exists: bool = False, parent=None):
+    def __init__(self, check_exists: bool = False, parent: Optional[QWidget] = None):
         super(FileLineEdit, self).__init__(parent)
 
         browse_action_icon = self.window().style().standardIcon(QStyle.SP_DirOpenIcon)
@@ -13,6 +13,7 @@ class FileLineEdit(QLineEdit):
         self._file_dialog = QFileDialog(self)
         self._file_dialog.setOption(QFileDialog.DontUseNativeDialog)
 
+        # noinspection PyUnusedLocal
         # noinspection PyUnresolvedReferences
         @self._browse_action.triggered.connect
         def on_browse_action_triggered(checked=False):

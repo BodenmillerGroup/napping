@@ -1,7 +1,5 @@
 imagecodecs
-napari[full]
-napari-czifile2
-napari-imc>=0.3.4
+napari[all]
 napari-plugin-engine>=0.1.4
 numpy
 pandas

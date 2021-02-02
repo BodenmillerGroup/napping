@@ -22,15 +22,15 @@ with open('requirements.txt') as f:
 
 
 # https://github.com/pypa/setuptools_scm
-use_scm = {"write_to": "napari_imcreg/_version.py"}
+use_scm = {"write_to": "napping/_version.py"}
 
 setup(
-    name='napari-imcreg',
+    name='napping',
     author='Jonas Windhager',
     author_email='jonas.windhager@uzh.ch',
     license='MIT',
-    url='https://github.com/BodenmillerGroup/napari-imcreg',
-    description='Control point-based coordinate transformation for Imaging Mass Cytometry (IMC)',
+    url='https://github.com/BodenmillerGroup/napping',
+    description='Control point mapping and coordination transformation using napari',
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
     packages=find_packages(),
@@ -53,10 +53,10 @@ setup(
     ],
     entry_points={
         'napari.plugin': [
-            'napari-imcreg = napari_imcreg',
+            'napping = napping',
         ],
         'console_scripts': [
-            'napari-imcreg = napari_imcreg.__main__:main'
+            'napping = napping.__main__:main'
         ],
     },
 )
