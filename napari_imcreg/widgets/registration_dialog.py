@@ -1,6 +1,6 @@
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING, Union
+from typing import Optional, Union
 from qtpy.QtCore import Qt, QSettings
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -18,9 +18,6 @@ from qtpy.QtWidgets import (
 )
 
 from napari_imcreg.widgets._file_line_edit import FileLineEdit
-
-if TYPE_CHECKING:
-    from napari_imcreg import IMCRegController
 
 
 class RegistrationDialog(QDialog):
@@ -62,10 +59,8 @@ class RegistrationDialog(QDialog):
     DEFAULT_TRANSFORMED_COORDS = ''
     DEFAULT_COORD_TRANSFORM_TYPE = CoordinateTransformType.SIMILARITY
 
-    def __init__(self, controller: 'IMCRegController', parent=None):
+    def __init__(self, settings: QSettings, parent=None):
         super(RegistrationDialog, self).__init__(parent)
-        self._controller = controller
-        settings = QSettings()
 
         checked_selection_mode = RegistrationDialog.SelectionMode(int(settings.value(
             self.SELECTION_MODE_SETTING, defaultValue=self.DEFAULT_SELECTION_MODE.value

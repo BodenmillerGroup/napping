@@ -7,7 +7,7 @@ from napari.layers.utils.text import TextManager
 from napari_imc import IMCController
 from napari_imc.models import IMCFileModel
 from pathlib import Path
-from qtpy.QtCore import QCoreApplication
+from qtpy.QtCore import QSettings
 from skimage.transform import estimate_transform, ProjectiveTransform
 from typing import Callable, List, Optional, Tuple, Union
 
@@ -29,6 +29,7 @@ class IMCRegController:
     AFFINE_TRANSFORM = 'affine'
 
     def __init__(self, source_imc_controller: IMCController, target_imc_controller: IMCController):
+        self._settings = QSettings('Bodenmiller Lab', 'napari-imcreg')
         self._source_view_controller = self.ViewController(self, source_imc_controller)
         self._target_view_controller = self.ViewController(self, target_imc_controller)
         self._source_file_paths: Optional[List[Path]] = None
@@ -43,14 +44,11 @@ class IMCRegController:
         self._current_transformed_coords: Optional[pd.DataFrame] = None
 
     def initialize(self):
-        QCoreApplication.setOrganizationName('Bodenmiller Lab')
-        QCoreApplication.setOrganizationDomain('bodenmillerlab.com')
-        QCoreApplication.setApplicationName('napari-imcreg')
         self._source_view_controller.initialize()
         self._target_view_controller.initialize()
 
     def show_dialog(self) -> bool:
-        registration_dialog = RegistrationDialog(self)
+        registration_dialog = RegistrationDialog(self._settings)
         if registration_dialog.exec() == RegistrationDialog.Accepted:
             if registration_dialog.selection_mode == RegistrationDialog.SelectionMode.FILE:
                 return self.load_file(
@@ -156,6 +154,10 @@ class IMCRegController:
     def show_next(self) -> bool:
         self._current_index = (self._current_index + 1) % len(self._source_file_paths)
         return self._show()
+
+    @property
+    def settings(self) -> QSettings:
+        return self._settings
 
     @property
     def source_view_controller(self) -> 'IMCRegController.ViewController':

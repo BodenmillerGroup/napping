@@ -1,5 +1,6 @@
+imagecodecs
 napari[full]
-napari-aicsimageio
+napari-czifile2
 napari-imc>=0.3.4
 napari-plugin-engine>=0.1.4
 numpy

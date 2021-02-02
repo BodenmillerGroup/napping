@@ -29,7 +29,7 @@ setup(
     author='Jonas Windhager',
     author_email='jonas.windhager@uzh.ch',
     license='MIT',
-    url='https://github.com/jwindhager/napari-imcreg',
+    url='https://github.com/BodenmillerGroup/napari-imcreg',
     description='Control point-based coordinate transformation for Imaging Mass Cytometry (IMC)',
     long_description=read('README.md'),
     long_description_content_type='text/markdown',
