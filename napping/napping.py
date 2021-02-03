@@ -553,7 +553,10 @@ class Napping:
 
         def _open_image(self, path: Path):
             self._image_path = path
-            self._image_layers = self._viewer.open(str(path), layer_type='image') or []
+            try:
+                self._image_layers = self._viewer.open(str(path), layer_type='image') or []
+            except:
+                self._image_layers = None
 
         def _close_image(self):
             self._image_path = None
