@@ -253,6 +253,17 @@ class Napping:
         return self._current_transform
 
     @property
+    def joint_transform(self) -> Optional[ProjectiveTransform]:
+        if self._current_transform is not None:
+            transform = self._current_transform
+            if self._pre_transform is not None:
+                transform = self._pre_transform + transform
+            if self._post_transform is not None:
+                transform = transform + self._post_transform
+            return transform
+        return None
+
+    @property
     def current_source_coords(self) -> Optional[pd.DataFrame]:
         return self._current_source_coords
 
@@ -417,7 +428,7 @@ class Napping:
 
         self._update_current_transform()
         with self.current_transform_dest_file_path.open('wb') as current_transform_dest_file:
-            pickle.dump(self._current_transform, current_transform_dest_file)
+            pickle.dump(self.joint_transform, current_transform_dest_file)
 
         self._update_current_transformed_coords()
         if self._current_transformed_coords is not None:
@@ -443,15 +454,10 @@ class Napping:
             self._current_transform = estimate_transform(transform_type, src, dst)
 
     def _update_current_transformed_coords(self):
-        if self._current_source_coords is not None and self._current_transform is not None:
+        if self._current_source_coords is not None and self.joint_transform is not None:
             coords = self._current_source_coords.loc[:, ['X', 'Y']].values
-            if self.pre_transform is not None:
-                coords = self.pre_transform(coords)
-            coords = self._current_transform(coords)
-            if self.post_transform is not None:
-                coords = self.post_transform(coords)
             self._current_transformed_coords = self._current_source_coords.copy()
-            self._current_transformed_coords.loc[:, ['X', 'Y']] = coords
+            self._current_transformed_coords.loc[:, ['X', 'Y']] = self.joint_transform(coords)
         else:
             self._current_transformed_coords = None
 
