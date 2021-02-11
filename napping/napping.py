@@ -496,7 +496,6 @@ class Napping:
             self._controller = controller
             self._widget: Optional[NappingWidget] = None
             self._image_path: Optional[Path] = None
-            self._image_layers: List[Image] = []
             self._points_layer: Optional[Points] = None
 
         def initialize(self):
@@ -529,10 +528,6 @@ class Napping:
             return self._image_path
 
         @property
-        def image_layers(self) -> List[Image]:
-            return self._image_layers
-
-        @property
         def points_layer(self) -> Optional[Points]:
             return self._points_layer
 
@@ -560,14 +555,15 @@ class Napping:
         def _open_image(self, path: Path):
             self._image_path = path
             try:
-                self._image_layers = self._viewer.open(str(path), layer_type='image') or []
+                self._viewer.open(str(path), layer_type='image')
             except:
-                self._image_layers = None
+                pass  # TODO https://github.com/napari/napari/issues/2201
 
         def _close_image(self):
             self._image_path = None
-            while len(self._image_layers) > 0:
-                self._viewer.layers.remove(self._image_layers.pop())
+            image_layers = [layer for layer in self._viewer.layers if layer != self._points_layer]
+            for image_layer in image_layers:
+                self._viewer.layers.remove(image_layer)
 
         def _add_points_layer(self):
             # noinspection PyUnresolvedReferences
