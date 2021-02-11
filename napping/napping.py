@@ -61,21 +61,26 @@ class Napping:
                     pre_transform_file_path=registration_dialog.pre_transform_path,
                     post_transform_file_path=registration_dialog.post_transform_path,
                 )
-            return self.load_dir(
-                self._to_matching_strategy(registration_dialog.matching_strategy),
-                registration_dialog.source_images_path,
-                registration_dialog.target_images_path,
-                registration_dialog.control_points_dest_path,
-                registration_dialog.transform_dest_path,
-                self._to_transform_type(registration_dialog.transform_type),
-                source_coords_dir_path=registration_dialog.source_coords_path,
-                transformed_coords_dest_dir_path=registration_dialog.transformed_coords_dest_path,
-                pre_transform_file_path=registration_dialog.pre_transform_path,
-                post_transform_file_path=registration_dialog.post_transform_path,
-                source_regex=registration_dialog.source_regex,
-                target_regex=registration_dialog.target_regex,
-                source_coords_regex=registration_dialog.source_coords_regex,
-            )
+            if registration_dialog.selection_mode == NappingDialog.SelectionMode.DIR:
+                registration_dialog.control_points_dest_path.mkdir(exist_ok=True)
+                registration_dialog.transform_dest_path.mkdir(exist_ok=True)
+                if registration_dialog.transformed_coords_dest_path is not None:
+                    registration_dialog.transformed_coords_dest_path.mkdir(exist_ok=True)
+                return self.load_dir(
+                    self._to_matching_strategy(registration_dialog.matching_strategy),
+                    registration_dialog.source_images_path,
+                    registration_dialog.target_images_path,
+                    registration_dialog.control_points_dest_path,
+                    registration_dialog.transform_dest_path,
+                    self._to_transform_type(registration_dialog.transform_type),
+                    source_coords_dir_path=registration_dialog.source_coords_path,
+                    transformed_coords_dest_dir_path=registration_dialog.transformed_coords_dest_path,
+                    pre_transform_file_path=registration_dialog.pre_transform_path,
+                    post_transform_file_path=registration_dialog.post_transform_path,
+                    source_regex=registration_dialog.source_regex,
+                    target_regex=registration_dialog.target_regex,
+                    source_coords_regex=registration_dialog.source_coords_regex,
+                )
         return False
 
     def load_file(
