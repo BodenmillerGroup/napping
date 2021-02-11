@@ -4,7 +4,7 @@ import pickle
 import re
 
 from napari import Viewer
-from napari.layers import Image, Points
+from napari.layers import Points
 from napari.layers.utils.text import TextManager
 from pathlib import Path
 from qtpy.QtCore import QSettings
@@ -545,11 +545,13 @@ class Napping:
         def control_points(self, control_points: pd.DataFrame):
             if self._points_layer is None:
                 raise RuntimeError('points layer is None')
-            self._points_layer.data = control_points.values
+            with self._points_layer.events.current_properties.blocker():
+                self._points_layer.data = control_points.values
             properties = self._points_layer.properties
             properties['id'] = control_points.index.values
             self._points_layer.properties = properties
             self._points_layer_text_workaround()
+            self._points_layer.refresh()
             self._widget.refresh()
 
         def _open_image(self, path: Path):
