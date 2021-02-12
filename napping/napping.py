@@ -3,6 +3,7 @@ import pandas as pd
 import pickle
 import re
 
+from contextlib import contextmanager
 from napari import Viewer
 from napari.layers import Points
 from napari.layers.utils.text import TextManager
@@ -41,6 +42,7 @@ class Napping:
         self._current_transform: Optional[ProjectiveTransform] = None
         self._current_source_coords: Optional[pd.DataFrame] = None
         self._current_transformed_coords: Optional[pd.DataFrame] = None
+        self._write_blocked = False
 
     def initialize(self):
         self._source_view_controller.initialize()
@@ -293,8 +295,9 @@ class Napping:
         target_control_points = value.loc[:, ['x_target', 'y_target']]
         source_control_points.columns = ['x', 'y']
         target_control_points.columns = ['x', 'y']
-        self.source_view_controller.control_points = source_control_points
-        self.target_view_controller.control_points = target_control_points
+        with self._block_write():
+            self.source_view_controller.control_points = source_control_points
+            self.target_view_controller.control_points = target_control_points
 
     @property
     def current_matched_control_points_residuals(self) -> Optional[np.ndarray]:
@@ -405,11 +408,11 @@ class Napping:
     def _load_transforms(self, pre_transform_file_path: Union[str, Path], post_transform_file_path: Union[str, Path]):
         self._post_transform = None
         if pre_transform_file_path is not None:
-            with Path(pre_transform_file_path).open('rb') as pre_transform_file:
+            with Path(pre_transform_file_path).open(mode='rb', buffering=0) as pre_transform_file:
                 self._pre_transform = pickle.load(pre_transform_file)
         self._post_transform = None
         if post_transform_file_path is not None:
-            with Path(post_transform_file_path).open('rb') as post_transform_file:
+            with Path(post_transform_file_path).open(mode='rb', buffering=0) as post_transform_file:
                 self._post_transform = pickle.load(post_transform_file)
 
     def _show(self) -> bool:
@@ -429,15 +432,19 @@ class Napping:
         return False
 
     def _handle_control_points_changed(self):
-        self.current_matched_control_points.to_csv(self.current_control_points_dest_file_path)
+        if not self._write_blocked:
+            with self.current_control_points_dest_file_path.open(mode='wb', buffering=0) as f:
+                self.current_matched_control_points.to_csv(f, mode='wb')
 
         self._update_current_transform()
-        with self.current_transform_dest_file_path.open('wb') as current_transform_dest_file:
-            pickle.dump(self.joint_transform, current_transform_dest_file)
+        if not self._write_blocked:
+            with self.current_transform_dest_file_path.open(mode='wb', buffering=0) as f:
+                pickle.dump(self.joint_transform, f)
 
         self._update_current_transformed_coords()
-        if self._current_transformed_coords is not None:
-            self._current_transformed_coords.to_csv(self.current_transformed_coords_dest_file_path, index=False)
+        if self._current_transformed_coords is not None and not self._write_blocked:
+            with self.current_transformed_coords_dest_file_path.open(mode='wb', buffering=0) as f:
+                self._current_transformed_coords.to_csv(f, mode='wb', index=False)
 
         self.source_view_controller.refresh()
         self.target_view_controller.refresh()
@@ -465,6 +472,12 @@ class Napping:
             self._current_transformed_coords.loc[:, ['X', 'Y']] = self.joint_transform(coords)
         else:
             self._current_transformed_coords = None
+
+    @contextmanager
+    def _block_write(self):
+        self._write_blocked = True
+        yield
+        self._write_blocked = False
 
     @classmethod
     def _to_matching_strategy(cls, matching_strategy: NappingDialog.MatchingStrategy) -> str:
@@ -540,7 +553,7 @@ class Napping:
         def control_points(self) -> Optional[pd.DataFrame]:
             if self._points_layer is not None:
                 return pd.DataFrame(
-                    data=self._points_layer.data,
+                    data=self._points_layer.data[:, ::-1],
                     index=self._points_layer.properties['id'],
                     columns=['x', 'y']
                 )
@@ -550,14 +563,11 @@ class Napping:
         def control_points(self, control_points: pd.DataFrame):
             if self._points_layer is None:
                 raise RuntimeError('points layer is None')
-            with self._points_layer.events.current_properties.blocker():
-                self._points_layer.data = control_points.values
+            self._points_layer.data = control_points.loc[:, ['y', 'x']].values
             properties = self._points_layer.properties
             properties['id'] = control_points.index.values
             self._points_layer.properties = properties
-            self._points_layer_text_workaround()
             self._points_layer.refresh()
-            self._widget.refresh()
 
         def _open_image(self, path: Path):
             self._image_path = path
@@ -578,14 +588,23 @@ class Napping:
             self._points_layer.mode = 'add'
 
             @self._points_layer.mouse_drag_callbacks.append
-            def on_points_layer_mouse_drag(layer, _):
+            def on_points_layer_mouse_drag(layer, event):
                 if layer.mode == 'add':
                     layer.current_properties['id'][0] = max(layer.properties['id'], default=0) + 1
+                elif layer.mode == 'select':  # TODO https://github.com/napari/napari/issues/2259
+                    yield
+                    while event.type == 'mouse_move':
+                        yield
+                    self._controller._handle_control_points_changed()
+
+            # called when control points are added/deleted (for dragging, see on_points_layer_mouse_drag)
+            @self._points_layer.events.data.connect
+            def on_points_layer_data_changed(_):
+                self._controller._handle_control_points_changed()
 
             @self._points_layer.events.current_properties.connect
             def on_points_layer_current_properties_changed(_):
                 self._points_layer_text_workaround()
-                self._controller._handle_control_points_changed()
 
         def _remove_points_layer(self):
             if self._points_layer is not None:
