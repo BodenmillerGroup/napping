@@ -571,10 +571,14 @@ class Napping:
 
         def _open_image(self, path: Path):
             self._image_path = path
-            try:
+            if path.suffix.lower() in ['.jfif', '.jpe', '.jpg', '.jpeg']:
+                # workaround to set exifrotate=False for JPEG-PIL
+                # TODO https://github.com/napari/napari/issues/2278
+                from imageio import imread
+                img = imread(path, exifrotate=False)
+                self._viewer.add_image(data=img, name=path.name)
+            else:
                 self._viewer.open(str(path), layer_type='image')
-            except:
-                pass  # TODO https://github.com/napari/napari/issues/2201
 
         def _close_image(self):
             self._image_path = None
