@@ -31,6 +31,18 @@ You can install `napping` via [pip]:
 To start `napping` from command line:
 
     napping
+    
+## Environment setup example: mapping IMC and slidescanner images
+
+As napari is under active development, the use of virtual environments is strongly encouraged. For example, to setup an environment for aligning Imaging Mass Cytometry (IMC, .mcd/.txt) and brightfield/immunofluorescence slidescanner (.czi) images:
+
+    conda create -n napping python
+    conda activate napping
+    pip install napping napari-imc napari-czifile2
+
+`napping` can again be started from inside the `conda` environment:
+
+    napping
 
 ## Contributing
 
