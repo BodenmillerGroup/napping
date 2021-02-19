@@ -36,7 +36,7 @@ To start `napping` from command line:
 
 As napari is under active development, the use of virtual environments is strongly encouraged. For example, to setup an environment for aligning Imaging Mass Cytometry (IMC, .mcd/.txt) and brightfield/immunofluorescence slidescanner (.czi) images:
 
-    conda create -n napping_imc python
+    conda create -n napping python
     conda activate napping_imc
     pip install napping napari-imc napari-czifile2
 
