@@ -31,6 +31,18 @@ You can install `napping` via [pip]:
 To start `napping` from command line:
 
     napping
+    
+## Environment for IMC and IF mapping
+
+Certain dependencies need to be installed for aligning imaging mass cytometry (IMC) and brightfield/immunofluorescence images:
+
+    conda create -n napping_imc python
+    conda activate napping_imc
+    pip install napping napari-imc napari-czifile2
+
+`napping` can again be started from inside the `conda` environment:
+
+    napping
 
 ## Contributing
 
