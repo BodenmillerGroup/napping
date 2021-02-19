@@ -32,7 +32,7 @@ To start `napping` from command line:
 
     napping
     
-## Environment for IMC and IF mapping
+## Environment setup example: mapping IMC and slidescanner images
 
 Certain dependencies need to be installed for aligning imaging mass cytometry (IMC) and brightfield/immunofluorescence images:
 
