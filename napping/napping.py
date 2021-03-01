@@ -465,10 +465,10 @@ class Napping:
     def _update_current_transformed_coords(self):
         self._current_transformed_coords = None
         if self._current_source_coords is not None and self.current_joint_transform is not None:
-            coords = np.ones(3)
-            coords[:2] = self._current_source_coords.loc[:, ['X', 'Y']].values
+            coords = np.ones((self._current_source_coords.shape[0], 3))
+            coords[:, :2] = self._current_source_coords.loc[:, ['X', 'Y']].values
             self._current_transformed_coords = self._current_source_coords.copy()
-            self._current_transformed_coords.loc[:, ['X', 'Y']] = (self.current_joint_transform @ coords)[:2]
+            self._current_transformed_coords.loc[:, ['X', 'Y']] = (self.current_joint_transform @ coords.T).T[:, :2]
 
     @contextmanager
     def _block_write(self):
