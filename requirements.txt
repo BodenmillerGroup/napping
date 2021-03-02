@@ -3,5 +3,6 @@ napari[all]
 napari-plugin-engine>=0.1.4
 numpy
 pandas
+pydantic!=1.8.0  # https://github.com/napari/napari/issues/2322
 qtpy
 scikit-image

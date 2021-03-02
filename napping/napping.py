@@ -421,10 +421,13 @@ class Napping:
             self._source_view_controller.show(self.current_source_image_file_path)
             self._target_view_controller.show(self.current_target_image_file_path)
             if self.current_control_points_dest_file_path.is_file():
-                self.current_matched_control_points = pd.read_csv(self.current_control_points_dest_file_path,
-                                                                  index_col=0)
+                df = pd.read_csv(self.current_control_points_dest_file_path, index_col=0)
+                if len(df.index) > 0:
+                    self.current_matched_control_points = df
             if self.current_source_coords_file_path is not None and self.current_source_coords_file_path.is_file():
-                self._current_source_coords = pd.read_csv(self.current_source_coords_file_path)
+                df = pd.read_csv(self.current_source_coords_file_path)
+                if len(df.index) > 0:
+                    self._current_source_coords = df
             self._update_current_transform()
             self._update_current_transformed_coords()
             self._source_view_controller.refresh()
