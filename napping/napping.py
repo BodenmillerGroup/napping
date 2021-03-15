@@ -459,11 +459,8 @@ class Napping:
             src = matched_control_points.loc[:, ['x_source', 'y_source']].values
             dst = matched_control_points.loc[:, ['x_target', 'y_target']].values
             tf = self._transform_class()
-            src_centroid = np.mean(src, axis=0)
-            if tf.estimate(src - src_centroid[None, :], dst):
-                src_centroid_transform = np.identity(3)
-                src_centroid_transform[:2, 2] = -src_centroid
-                self._current_transform = tf.params @ src_centroid_transform
+            if tf.estimate(src, dst):
+                self._current_transform = tf.params
 
     def _update_current_transformed_coords(self):
         self._current_transformed_coords = None
