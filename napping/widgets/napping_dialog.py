@@ -1,6 +1,7 @@
 from enum import Enum, IntEnum
 from pathlib import Path
-from typing import Optional, Union
+from skimage.transform import AffineTransform, EuclideanTransform, ProjectiveTransform, SimilarityTransform
+from typing import Optional, Type, Union
 from qtpy.QtCore import Qt, QObject, QSettings
 from qtpy.QtWidgets import (
     QButtonGroup,
@@ -42,7 +43,7 @@ class NappingDialog(QDialog):
     TARGET_IMAGES_SETTING = 'registrationDialog/targetImages'
     TARGET_REGEX_SETTING = 'registrationDialog/targetRegex'
     CONTROL_POINTS_DEST_SETTING = 'registrationDialog/controlPointsDest'
-    TRANSFORM_DEST_SETTING = 'registrationDialog/transformDest'
+    JOINT_TRANSFORM_DEST_SETTING = 'registrationDialog/jointTransformDest'
     TRANSFORM_TYPE_SETTING = 'registrationDialog/transformType'
     SOURCE_COORDS_SETTING = 'registrationDialog/sourceCoords'
     SOURCE_COORDS_REGEX_SETTING = 'registrationDialog/sourceCoordsRegex'
@@ -57,7 +58,7 @@ class NappingDialog(QDialog):
     DEFAULT_TARGET_IMAGES = ''
     DEFAULT_TARGET_REGEX = ''
     DEFAULT_CONTROL_POINTS_DEST = ''
-    DEFAULT_TRANSFORM_DEST = ''
+    DEFAULT_JOINT_TRANSFORM_DEST = ''
     DEFAULT_TRANSFORM_TYPE = TransformType.SIMILARITY
     DEFAULT_SOURCE_COORDS = ''
     DEFAULT_SOURCE_COORDS_REGEX = ''
@@ -137,14 +138,14 @@ class NappingDialog(QDialog):
         # noinspection PyUnresolvedReferences
         self._control_points_dest_file_line_edit.textChanged.connect(lambda text: self.refresh(text))
 
-        transform_dest_file_line_edit_text = str(settings.value(
-            self.TRANSFORM_DEST_SETTING, defaultValue=self.DEFAULT_TRANSFORM_DEST
+        joint_transform_dest_file_line_edit_text = str(settings.value(
+            self.JOINT_TRANSFORM_DEST_SETTING, defaultValue=self.DEFAULT_JOINT_TRANSFORM_DEST
         ))
-        self._transform_dest_file_line_edit = FileLineEdit(parent=self)
-        self._transform_dest_file_line_edit.file_dialog.setWindowTitle('Select transform destination')
-        self._transform_dest_file_line_edit.setText(transform_dest_file_line_edit_text)
+        self._joint_transform_dest_file_line_edit = FileLineEdit(parent=self)
+        self._joint_transform_dest_file_line_edit.file_dialog.setWindowTitle('Select joint transform destination')
+        self._joint_transform_dest_file_line_edit.setText(joint_transform_dest_file_line_edit_text)
         # noinspection PyUnresolvedReferences
-        self._transform_dest_file_line_edit.textChanged.connect(lambda text: self.refresh(text))
+        self._joint_transform_dest_file_line_edit.textChanged.connect(lambda text: self.refresh(text))
 
         transform_type_combo_box_current_text = str(settings.value(
             self.TRANSFORM_TYPE_SETTING, defaultValue=self.DEFAULT_TRANSFORM_TYPE
@@ -190,7 +191,7 @@ class NappingDialog(QDialog):
         self._pre_transform_file_line_edit.file_dialog.setWindowTitle('Select pre-transform')
         self._pre_transform_file_line_edit.setText(pre_transform_file_line_edit_text)
         self._pre_transform_file_line_edit.file_dialog.setFileMode(QFileDialog.ExistingFile)
-        self._pre_transform_file_line_edit.file_dialog.setNameFilter('Pickle files (*.pickle)')
+        self._pre_transform_file_line_edit.file_dialog.setNameFilter('Numpy files (*.npy)')
         # noinspection PyUnresolvedReferences
         self._pre_transform_file_line_edit.textChanged.connect(lambda text: self.refresh(text))
 
@@ -200,7 +201,7 @@ class NappingDialog(QDialog):
         self._post_transform_file_line_edit = FileLineEdit(parent=self)
         self._post_transform_file_line_edit.file_dialog.setWindowTitle('Select post-transform')
         self._post_transform_file_line_edit.file_dialog.setFileMode(QFileDialog.ExistingFile)
-        self._post_transform_file_line_edit.file_dialog.setNameFilter('Pickle files (*.pickle)')
+        self._post_transform_file_line_edit.file_dialog.setNameFilter('Numpy files (*.npy)')
         self._post_transform_file_line_edit.setText(post_transform_file_line_edit_text)
         # noinspection PyUnresolvedReferences
         self._post_transform_file_line_edit.textChanged.connect(lambda text: self.refresh(text))
@@ -218,7 +219,7 @@ class NappingDialog(QDialog):
             settings.setValue(self.TARGET_IMAGES_SETTING, str(self.target_images_path))
             settings.setValue(self.TARGET_REGEX_SETTING, self.target_regex)
             settings.setValue(self.CONTROL_POINTS_DEST_SETTING, str(self.control_points_dest_path))
-            settings.setValue(self.TRANSFORM_DEST_SETTING, str(self.transform_dest_path))
+            settings.setValue(self.JOINT_TRANSFORM_DEST_SETTING, str(self.joint_transform_dest_path))
             settings.setValue(self.TRANSFORM_TYPE_SETTING, self.transform_type.value)
             settings.setValue(self.MATCHING_STRATEGY_SETTING, self.matching_strategy.value)
             settings.setValue(self.SOURCE_COORDS_SETTING, str(self.source_coords_path or ''))
@@ -239,7 +240,7 @@ class NappingDialog(QDialog):
         required_group_box_layout.addRow('Target image(s):', self._target_images_file_line_edit)
         required_group_box_layout.addRow(self._target_regex_label, self._target_regex_line_edit)
         required_group_box_layout.addRow('Control points dest.:', self._control_points_dest_file_line_edit)
-        required_group_box_layout.addRow('Transform dest.:', self._transform_dest_file_line_edit)
+        required_group_box_layout.addRow('Joint transform dest.:', self._joint_transform_dest_file_line_edit)
         required_group_box_layout.addRow('Transform type:', self._transform_type_combo_box)
         required_group_box.setLayout(required_group_box_layout)
 
@@ -309,12 +310,20 @@ class NappingDialog(QDialog):
         return self._control_points_dest_file_line_edit.path
 
     @property
-    def transform_dest_path(self) -> Optional[Path]:
-        return self._transform_dest_file_line_edit.path
+    def joint_transform_dest_path(self) -> Optional[Path]:
+        return self._joint_transform_dest_file_line_edit.path
 
     @property
     def transform_type(self) -> 'NappingDialog.TransformType':
         return NappingDialog.TransformType(self._transform_type_combo_box.currentText())
+
+    @property
+    def transform_class(self) -> Type[ProjectiveTransform]:
+        return {
+            NappingDialog.TransformType.EUCLIDEAN: EuclideanTransform,
+            NappingDialog.TransformType.SIMILARITY: SimilarityTransform,
+            NappingDialog.TransformType.AFFINE: AffineTransform
+        }[self.transform_type]
 
     @property
     def source_coords_path(self) -> Optional[Path]:
@@ -345,7 +354,7 @@ class NappingDialog(QDialog):
                 return False
             if self.control_points_dest_path is None or self.control_points_dest_path.is_dir():
                 return False
-            if self.transform_dest_path is None or self.transform_dest_path.is_dir():
+            if self.joint_transform_dest_path is None or self.joint_transform_dest_path.is_dir():
                 return False
             if self.source_coords_path is not None and not self.source_coords_path.is_file():
                 return False
@@ -358,7 +367,7 @@ class NappingDialog(QDialog):
                 return False
             if self.control_points_dest_path is None or self.control_points_dest_path.is_file():
                 return False
-            if self.transform_dest_path is None or self.transform_dest_path.is_file():
+            if self.joint_transform_dest_path is None or self.joint_transform_dest_path.is_file():
                 return False
             if self.source_coords_path is not None and not self.source_coords_path.is_dir():
                 return False
@@ -385,7 +394,7 @@ class NappingDialog(QDialog):
             self.source_images_path,
             self.target_images_path,
             self.control_points_dest_path,
-            self.transform_dest_path
+            self.joint_transform_dest_path
         }
         if self.source_coords_path is not None and self.transformed_coords_dest_path is not None:
             unique_paths.update({self.source_coords_path, self.transformed_coords_dest_path})
@@ -401,7 +410,7 @@ class NappingDialog(QDialog):
             self._source_images_file_line_edit.file_dialog.setDirectory(directory)
             self._target_images_file_line_edit.file_dialog.setDirectory(directory)
             self._control_points_dest_file_line_edit.file_dialog.setDirectory(directory)
-            self._transform_dest_file_line_edit.file_dialog.setDirectory(directory)
+            self._joint_transform_dest_file_line_edit.file_dialog.setDirectory(directory)
             self._source_coords_file_line_edit.file_dialog.setDirectory(directory)
             self._transformed_coords_dest_file_line_edit.file_dialog.setDirectory(directory)
             self._pre_transform_file_line_edit.file_dialog.setDirectory(directory)
@@ -413,8 +422,8 @@ class NappingDialog(QDialog):
                 existing_file_mode = QFileDialog.ExistingFile
                 control_points_name_filter = 'CSV files (*.csv)'
                 control_points_default_suffix = '.csv'
-                transform_name_filter = 'Pickle files (*.pickle)'
-                transform_default_suffix = '.pickle'
+                transform_name_filter = 'Numpy files (*.npy)'
+                transform_default_suffix = '.npy'
                 source_coords_name_filter = transformed_coords_name_filter = 'CSV files (*.csv)'
                 source_coords_default_suffix = transformed_coords_default_suffix = '.csv'
                 show_dirs_only = False
@@ -440,10 +449,10 @@ class NappingDialog(QDialog):
             self._control_points_dest_file_line_edit.file_dialog.setDefaultSuffix(control_points_default_suffix)
             self._control_points_dest_file_line_edit.file_dialog.setOption(QFileDialog.ShowDirsOnly, show_dirs_only)
 
-            self._transform_dest_file_line_edit.file_dialog.setFileMode(any_file_mode)
-            self._transform_dest_file_line_edit.file_dialog.setNameFilter(transform_name_filter)
-            self._transform_dest_file_line_edit.file_dialog.setDefaultSuffix(transform_default_suffix)
-            self._transform_dest_file_line_edit.file_dialog.setOption(QFileDialog.ShowDirsOnly, show_dirs_only)
+            self._joint_transform_dest_file_line_edit.file_dialog.setFileMode(any_file_mode)
+            self._joint_transform_dest_file_line_edit.file_dialog.setNameFilter(transform_name_filter)
+            self._joint_transform_dest_file_line_edit.file_dialog.setDefaultSuffix(transform_default_suffix)
+            self._joint_transform_dest_file_line_edit.file_dialog.setOption(QFileDialog.ShowDirsOnly, show_dirs_only)
 
             self._source_coords_file_line_edit.file_dialog.setFileMode(existing_file_mode)
             self._source_coords_file_line_edit.file_dialog.setNameFilter(source_coords_name_filter)

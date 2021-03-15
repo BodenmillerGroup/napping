@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pickle
 import re
 
 from contextlib import contextmanager
@@ -9,8 +8,8 @@ from napari.layers import Points
 from napari.layers.utils.text import TextManager
 from pathlib import Path
 from qtpy.QtCore import QSettings
-from skimage.transform import estimate_transform, ProjectiveTransform
-from typing import Callable, List, Optional, Tuple, Union
+from skimage.transform import ProjectiveTransform
+from typing import Callable, List, Optional, Tuple, Type, Union
 
 from napping.utils import iter_files
 from napping.widgets import NappingDialog, NappingWidget
@@ -21,10 +20,6 @@ class Napping:
     MATCH_FILENAME = 'filename'
     MATCH_REGEX = 'regex'
 
-    EUCLIDEAN_TRANSFORM = 'euclidean'
-    SIMILARITY_TRANSFORM = 'similarity'
-    AFFINE_TRANSFORM = 'affine'
-
     def __init__(self, source_viewer: Viewer, target_viewer: Viewer):
         self._settings = QSettings('Bodenmiller Lab', 'napping')
         self._source_view_controller = self.ViewController(source_viewer, self)
@@ -32,14 +27,14 @@ class Napping:
         self._source_image_file_paths: Optional[List[Path]] = None
         self._target_image_file_paths: Optional[List[Path]] = None
         self._control_points_dest_file_paths: Optional[List[Path]] = None
-        self._transform_dest_file_paths: Optional[List[Path]] = None
-        self._transform_type: Optional[str] = None
+        self._joint_transform_dest_file_paths: Optional[List[Path]] = None
+        self._transform_class: Optional[Type[ProjectiveTransform]] = None
         self._source_coords_file_paths: Optional[List[Path]] = None
         self._transformed_coords_dest_file_paths: Optional[List[Path]] = None
-        self._pre_transform: Optional[ProjectiveTransform] = None
-        self._post_transform: Optional[ProjectiveTransform] = None
+        self._pre_transform: Optional[np.ndarray] = None
+        self._post_transform: Optional[np.ndarray] = None
         self._current_index: Optional[int] = None
-        self._current_transform: Optional[ProjectiveTransform] = None
+        self._current_transform: Optional[np.ndarray] = None
         self._current_source_coords: Optional[pd.DataFrame] = None
         self._current_transformed_coords: Optional[pd.DataFrame] = None
         self._write_blocked = False
@@ -56,8 +51,8 @@ class Napping:
                     registration_dialog.source_images_path,
                     registration_dialog.target_images_path,
                     registration_dialog.control_points_dest_path,
-                    registration_dialog.transform_dest_path,
-                    self._to_transform_type(registration_dialog.transform_type),
+                    registration_dialog.joint_transform_dest_path,
+                    registration_dialog.transform_class,
                     source_coords_file_path=registration_dialog.source_coords_path,
                     transformed_coords_dest_file_path=registration_dialog.transformed_coords_dest_path,
                     pre_transform_file_path=registration_dialog.pre_transform_path,
@@ -65,16 +60,21 @@ class Napping:
                 )
             if registration_dialog.selection_mode == NappingDialog.SelectionMode.DIR:
                 registration_dialog.control_points_dest_path.mkdir(exist_ok=True)
-                registration_dialog.transform_dest_path.mkdir(exist_ok=True)
+                registration_dialog.joint_transform_dest_path.mkdir(exist_ok=True)
                 if registration_dialog.transformed_coords_dest_path is not None:
                     registration_dialog.transformed_coords_dest_path.mkdir(exist_ok=True)
+                matching_strategy = {
+                    NappingDialog.MatchingStrategy.ALPHABETICAL: self.MATCH_ALPHABETICAL,
+                    NappingDialog.MatchingStrategy.FILENAME: self.MATCH_FILENAME,
+                    NappingDialog.MatchingStrategy.REGEX: self.MATCH_REGEX,
+                }[registration_dialog.matching_strategy]
                 return self.load_dir(
-                    self._to_matching_strategy(registration_dialog.matching_strategy),
+                    matching_strategy,
                     registration_dialog.source_images_path,
                     registration_dialog.target_images_path,
                     registration_dialog.control_points_dest_path,
-                    registration_dialog.transform_dest_path,
-                    self._to_transform_type(registration_dialog.transform_type),
+                    registration_dialog.joint_transform_dest_path,
+                    registration_dialog.transform_class,
                     source_coords_dir_path=registration_dialog.source_coords_path,
                     transformed_coords_dest_dir_path=registration_dialog.transformed_coords_dest_path,
                     pre_transform_file_path=registration_dialog.pre_transform_path,
@@ -90,8 +90,8 @@ class Napping:
             source_image_file_path: Union[str, Path],
             target_image_file_path: Union[str, Path],
             control_points_dest_file_path: Union[str, Path],
-            transform_dest_file_path: Union[str, Path],
-            transform_type: str,
+            joint_transform_dest_file_path: Union[str, Path],
+            transform_class: Type[ProjectiveTransform],
             source_coords_file_path: Union[str, Path, None] = None,
             transformed_coords_dest_file_path: Union[str, Path, None] = None,
             pre_transform_file_path: Union[str, Path, None] = None,
@@ -101,15 +101,15 @@ class Napping:
         self._source_image_file_paths = [Path(source_image_file_path)]
         self._target_image_file_paths = [Path(target_image_file_path)]
         self._control_points_dest_file_paths = [Path(control_points_dest_file_path)]
-        self._transform_dest_file_paths = [Path(transform_dest_file_path)]
-        self._transform_type = transform_type
+        self._joint_transform_dest_file_paths = [Path(joint_transform_dest_file_path)]
+        self._transform_class = transform_class
         self._source_coords_file_paths = None
         if source_coords_file_path is not None:
             self._source_coords_file_paths = [Path(source_coords_file_path)]
         self._transformed_coords_dest_file_paths = None
         if transformed_coords_dest_file_path is not None:
             self._transformed_coords_dest_file_paths = [Path(transformed_coords_dest_file_path)]
-        self._load_transforms(pre_transform_file_path, post_transform_file_path)
+        self._load_pre_post_transforms(pre_transform_file_path, post_transform_file_path)
         self._current_index = 0
         return self._show()
 
@@ -119,8 +119,8 @@ class Napping:
             source_image_dir_path: Union[str, Path],
             target_image_dir_path: Union[str, Path],
             control_points_dest_dir_path: Union[str, Path],
-            transform_dest_dir_path: Union[str, Path],
-            transform_type: str,
+            joint_transform_dest_dir_path: Union[str, Path],
+            transform_class: Type[ProjectiveTransform],
             source_coords_dir_path: Optional[Union[str, Path]] = None,
             transformed_coords_dest_dir_path: Optional[Union[str, Path]] = None,
             pre_transform_file_path: Union[str, Path, None] = None,
@@ -132,7 +132,7 @@ class Napping:
         source_image_dir_path = Path(source_image_dir_path)
         target_image_dir_path = Path(target_image_dir_path)
         control_points_dest_dir_path = Path(control_points_dest_dir_path)
-        transform_dest_dir_path = Path(transform_dest_dir_path)
+        joint_transform_dest_dir_path = Path(joint_transform_dest_dir_path)
         if source_coords_dir_path is not None:
             source_coords_dir_path = Path(source_coords_dir_path)
         if transformed_coords_dest_dir_path is not None:
@@ -150,16 +150,16 @@ class Napping:
         self._control_points_dest_file_paths = [
             control_points_dest_dir_path / f'{path.stem}.csv' for path in self._target_image_file_paths
         ]
-        self._transform_dest_file_paths = [
-            transform_dest_dir_path / f'{path.stem}.pickle' for path in self._target_image_file_paths
+        self._joint_transform_dest_file_paths = [
+            joint_transform_dest_dir_path / f'{path.stem}.npy' for path in self._target_image_file_paths
         ]
-        self._transform_type = transform_type
+        self._transform_class = transform_class
         self._transformed_coords_dest_file_paths = None
         if transformed_coords_dest_dir_path is not None:
             self._transformed_coords_dest_file_paths = [
                 transformed_coords_dest_dir_path / f'{path.stem}.csv' for path in self._target_image_file_paths
             ]
-        self._load_transforms(pre_transform_file_path, post_transform_file_path)
+        self._load_pre_post_transforms(pre_transform_file_path, post_transform_file_path)
         self._current_index = 0
         return self._show()
 
@@ -196,12 +196,12 @@ class Napping:
         return self._control_points_dest_file_paths
 
     @property
-    def transform_dest_file_paths(self) -> Optional[List[Path]]:
-        return self._transform_dest_file_paths
+    def joint_transform_dest_file_paths(self) -> Optional[List[Path]]:
+        return self._joint_transform_dest_file_paths
 
     @property
-    def transform_type(self) -> Optional[str]:
-        return self._transform_type
+    def transform_class(self) -> Optional[Type[ProjectiveTransform]]:
+        return self._transform_class
 
     @property
     def source_coords_file_paths(self) -> Optional[List[Path]]:
@@ -212,11 +212,11 @@ class Napping:
         return self._transformed_coords_dest_file_paths
 
     @property
-    def pre_transform(self) -> Optional[ProjectiveTransform]:
+    def pre_transform(self) -> Optional[np.ndarray]:
         return self._pre_transform
 
     @property
-    def post_transform(self) -> Optional[ProjectiveTransform]:
+    def post_transform(self) -> Optional[np.ndarray]:
         return self._post_transform
 
     @property
@@ -238,9 +238,9 @@ class Napping:
         return None
 
     @property
-    def current_transform_dest_file_path(self) -> Optional[Path]:
+    def current_joint_transform_dest_file_path(self) -> Optional[Path]:
         if self._current_index is not None:
-            return self._transform_dest_file_paths[self._current_index]
+            return self._joint_transform_dest_file_paths[self._current_index]
         return None
 
     @property
@@ -256,17 +256,17 @@ class Napping:
         return None
 
     @property
-    def current_transform(self) -> Optional[ProjectiveTransform]:
+    def current_transform(self) -> Optional[np.ndarray]:
         return self._current_transform
 
     @property
-    def joint_transform(self) -> Optional[ProjectiveTransform]:
+    def current_joint_transform(self) -> Optional[np.ndarray]:
         if self._current_transform is not None:
             transform = self._current_transform
             if self._pre_transform is not None:
-                transform = self._pre_transform + transform
+                transform = transform @ self._pre_transform
             if self._post_transform is not None:
-                transform = transform + self._post_transform
+                transform = self._post_transform @ transform
             return transform
         return None
 
@@ -304,9 +304,11 @@ class Napping:
         if self._current_transform is not None:
             matched_control_points = self.current_matched_control_points
             if matched_control_points is not None and not matched_control_points.empty:
-                src = matched_control_points.loc[:, ['x_source', 'y_source']].values
-                dst = matched_control_points.loc[:, ['x_target', 'y_target']].values
-                return self._current_transform.residuals(src, dst)
+                tf = self._transform_class(self._current_transform)
+                return tf.residuals(
+                    matched_control_points.loc[:, ['x_source', 'y_source']].values,
+                    matched_control_points.loc[:, ['x_target', 'y_target']].values
+                )
         return None
 
     @staticmethod
@@ -405,25 +407,27 @@ class Napping:
                 matched_source_coords_file_paths.append(matched_source_coords_file_path)
         return matched_source_file_paths, matched_target_file_paths, matched_source_coords_file_paths
 
-    def _load_transforms(self, pre_transform_file_path: Union[str, Path], post_transform_file_path: Union[str, Path]):
+    def _load_pre_post_transforms(self, pre_transform_file_path: Union[str, Path],
+                                  post_transform_file_path: Union[str, Path]):
         self._post_transform = None
         if pre_transform_file_path is not None:
-            with Path(pre_transform_file_path).open(mode='rb', buffering=0) as pre_transform_file:
-                self._pre_transform = pickle.load(pre_transform_file)
+            self._pre_transform = np.load(pre_transform_file_path)
         self._post_transform = None
         if post_transform_file_path is not None:
-            with Path(post_transform_file_path).open(mode='rb', buffering=0) as post_transform_file:
-                self._post_transform = pickle.load(post_transform_file)
+            self._post_transform = np.load(post_transform_file_path)
 
     def _show(self) -> bool:
         if 0 <= self._current_index < len(self._source_image_file_paths):
             self._source_view_controller.show(self.current_source_image_file_path)
             self._target_view_controller.show(self.current_target_image_file_path)
             if self.current_control_points_dest_file_path.is_file():
-                self.current_matched_control_points = pd.read_csv(self.current_control_points_dest_file_path,
-                                                                  index_col=0)
+                df = pd.read_csv(self.current_control_points_dest_file_path, index_col=0)
+                if len(df.index) > 0:
+                    self.current_matched_control_points = df
             if self.current_source_coords_file_path is not None and self.current_source_coords_file_path.is_file():
-                self._current_source_coords = pd.read_csv(self.current_source_coords_file_path)
+                df = pd.read_csv(self.current_source_coords_file_path)
+                if len(df.index) > 0:
+                    self._current_source_coords = df
             self._update_current_transform()
             self._update_current_transformed_coords()
             self._source_view_controller.refresh()
@@ -438,8 +442,7 @@ class Napping:
 
         self._update_current_transform()
         if not self._write_blocked:
-            with self.current_transform_dest_file_path.open(mode='wb', buffering=0) as f:
-                pickle.dump(self.joint_transform, f)
+            np.save(self.current_joint_transform_dest_file_path, self.current_joint_transform)
 
         self._update_current_transformed_coords()
         if self._current_transformed_coords is not None and not self._write_blocked:
@@ -450,54 +453,31 @@ class Napping:
         self.target_view_controller.refresh()
 
     def _update_current_transform(self):
-        if self._transform_type == self.EUCLIDEAN_TRANSFORM:
-            transform_type = 'euclidean'
-        elif self._transform_type == self.SIMILARITY_TRANSFORM:
-            transform_type = 'similarity'
-        elif self._transform_type == self.AFFINE_TRANSFORM:
-            transform_type = 'affine'
-        else:
-            raise ValueError(f'Unsupported coordinate transform type: {self._transform_type}')
         self._current_transform = None
         matched_control_points = self.current_matched_control_points
         if matched_control_points.shape[0] >= 3:
             src = matched_control_points.loc[:, ['x_source', 'y_source']].values
             dst = matched_control_points.loc[:, ['x_target', 'y_target']].values
-            self._current_transform = estimate_transform(transform_type, src, dst)
+            tf = self._transform_class()
+            src_centroid = np.mean(src, axis=0)
+            if tf.estimate(src - src_centroid[None, :], dst):
+                src_centroid_transform = np.identity(3)
+                src_centroid_transform[:2, 2] = -src_centroid
+                self._current_transform = tf.params @ src_centroid_transform
 
     def _update_current_transformed_coords(self):
-        if self._current_source_coords is not None and self.joint_transform is not None:
-            coords = self._current_source_coords.loc[:, ['X', 'Y']].values
+        self._current_transformed_coords = None
+        if self._current_source_coords is not None and self.current_joint_transform is not None:
+            coords = np.ones((self._current_source_coords.shape[0], 3))
+            coords[:, :2] = self._current_source_coords.loc[:, ['X', 'Y']].values
             self._current_transformed_coords = self._current_source_coords.copy()
-            self._current_transformed_coords.loc[:, ['X', 'Y']] = self.joint_transform(coords)
-        else:
-            self._current_transformed_coords = None
+            self._current_transformed_coords.loc[:, ['X', 'Y']] = (self.current_joint_transform @ coords.T).T[:, :2]
 
     @contextmanager
     def _block_write(self):
         self._write_blocked = True
         yield
         self._write_blocked = False
-
-    @classmethod
-    def _to_matching_strategy(cls, matching_strategy: NappingDialog.MatchingStrategy) -> str:
-        if matching_strategy == NappingDialog.MatchingStrategy.ALPHABETICAL:
-            return cls.MATCH_ALPHABETICAL
-        if matching_strategy == NappingDialog.MatchingStrategy.FILENAME:
-            return cls.MATCH_FILENAME
-        if matching_strategy == NappingDialog.MatchingStrategy.REGEX:
-            return cls.MATCH_REGEX
-        raise ValueError('Unsupported file matching strategy')
-
-    @classmethod
-    def _to_transform_type(cls, transform_type: NappingDialog.TransformType) -> str:
-        if transform_type == NappingDialog.TransformType.EUCLIDEAN:
-            return cls.EUCLIDEAN_TRANSFORM
-        if transform_type == NappingDialog.TransformType.SIMILARITY:
-            return cls.SIMILARITY_TRANSFORM
-        if transform_type == NappingDialog.TransformType.AFFINE:
-            return cls.AFFINE_TRANSFORM
-        raise ValueError('Unsupported coordinate transform type')
 
     class ViewController:
         _points_layer_args = {
