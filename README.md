@@ -6,7 +6,7 @@
 ![GitHub issues](https://img.shields.io/github/issues/BodenmillerGroup/napping)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/BodenmillerGroup/napping)
 
-Control point mapping and coordination transformation using napari
+Control point mapping and coordinate transformation using napari
 
 ## Requirements
 
