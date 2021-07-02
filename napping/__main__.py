@@ -1,7 +1,6 @@
 import napari
 import sys
 
-from qtpy.QtCore import QTimer
 from qtpy.QtWidgets import QMessageBox
 
 from napping.napping import Napping, NappingException
@@ -18,29 +17,22 @@ if Image is not None:
 
 
 def main() -> int:
-    with napari.gui_qt() as app:
-        source_viewer = napari.Viewer(title='napping [source]')
-        target_viewer = napari.Viewer(title='napping [target]')
+    source_viewer = napari.Viewer(title='napping [source]')
+    target_viewer = napari.Viewer(title='napping [target]')
+    napari.run()
 
-        def close_and_quit():
-            source_viewer.close()
-            target_viewer.close()
-            QTimer().singleShot(1000, app.quit)
-
-        try:
-            controller = Napping(source_viewer, target_viewer)
-            controller.initialize()
-            if not controller.show_dialog():
-                # noinspection PyArgumentList
-                QMessageBox.critical(source_viewer.window.qt_viewer, 'napping error',
-                                     'File matching aborted or no matching files found')
-                close_and_quit()
-                return 1
-        except NappingException as e:
+    try:
+        controller = Napping(source_viewer, target_viewer)
+        controller.initialize()
+        if not controller.show_dialog():
             # noinspection PyArgumentList
-            QMessageBox.critical(source_viewer.window.qt_viewer, 'napping exception', str(e))
-            close_and_quit()
+            QMessageBox.critical(source_viewer.window.qt_viewer, 'napping error',
+                                 'File matching aborted or no matching files found')
             return 1
+    except NappingException as e:
+        # noinspection PyArgumentList
+        QMessageBox.critical(source_viewer.window.qt_viewer, 'napping exception', str(e))
+        return 1
     return 0
 
 
