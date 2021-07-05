@@ -495,7 +495,7 @@ class Napping:
 
         def initialize(self):
             self._widget = NappingWidget(self)
-            self._viewer.window.add_dock_widget(self._widget, name='Napping')
+            self._viewer.window.add_dock_widget(self._widget, name='Napping', area='bottom', allowed_areas=['top', 'bottom'])
 
         def show(self, path: Path):
             self._close_image()
