@@ -26,9 +26,11 @@ def main() -> None:
             # noinspection PyArgumentList
             QMessageBox.critical(source_viewer.window.qt_viewer, 'napping error',
                                  'File matching aborted or no matching files found')
+            return
     except NappingException as e:
         # noinspection PyArgumentList
         QMessageBox.critical(source_viewer.window.qt_viewer, 'napping exception', str(e))
+        return
     app.exec_()
 
 
