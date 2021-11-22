@@ -5,7 +5,4 @@ except ImportError:
 
 from napping.napping import Napping, NappingException
 
-__all__ = [
-    'Napping',
-    'NappingException',
-]
+__all__ = ["Napping", "NappingException"]
