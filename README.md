@@ -1,42 +1,26 @@
 # napping
 
-![PyPI](https://img.shields.io/pypi/v/napping)
-![PyPI - Python Version](https://img.shields.io/pypi/pyversions/napping)
-![PyPI - License](https://img.shields.io/pypi/l/napping)
-![GitHub issues](https://img.shields.io/github/issues/BodenmillerGroup/napping)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/BodenmillerGroup/napping)
+[![PyPI](https://img.shields.io/pypi/v/napping.svg?color=green)](https://pypi.org/project/napping)
+[![License](https://img.shields.io/pypi/l/napping.svg?color=green)](https://github.com/BodenmillerGroup/napping/raw/main/LICENSE)
+[![Python Version](https://img.shields.io/pypi/pyversions/napping.svg?color=green)](https://python.org)
+[![Issues](https://img.shields.io/github/issues/BodenmillerGroup/napping)](https://github.com/BodenmillerGroup/napping/issues)
+[![Pull requests](https://img.shields.io/github/issues-pr/BodenmillerGroup/napping)](https://github.com/BodenmillerGroup/napping/pulls)
 
 Control point mapping and coordinate transformation using napari
 
-## Requirements
-
-This package requires Python 3.7 or newer.
-
-Python package dependencies are listed in [requirements.txt](https://github.com/BodenmillerGroup/napping/blob/main/requirements.txt).
-
-Using virtual environments is strongly recommended.
-
 ## Installation
 
-Install napping and its dependencies with:
+You can install `napping` via [pip](https://pypi.org/project/pip/):
 
     pip install napping
 
-### Environment setup example: mapping IMC and slidescanner images
+To install latest development version:
 
-As napari is under active development, the use of virtual environments is strongly encouraged. For example, to set up an environment for aligning Imaging Mass Cytometry (IMC, .mcd/.txt) and bright-field/immunofluorescence slidescanner (.czi) images:
-
-    conda create -n napping python
-    conda activate napping
-    pip install napping napari-imc napari-czifile2
-
-Afterwards, napping can be started from inside the environment:
-
-    napping
+    pip install git+https://github.com/BodenmillerGroup/napping.git
 
 ## Usage
 
-Use `napping` for control point mapping and coordinate transformation
+Run `napping` for control point mapping and coordinate transformation
 
 ## Authors
 
