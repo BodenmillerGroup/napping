@@ -1,0 +1,2 @@
+class NappingException(Exception):
+    pass

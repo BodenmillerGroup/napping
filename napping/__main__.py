@@ -1,8 +1,9 @@
-import napari
+import sys
 
-from qtpy.QtWidgets import QApplication, QMessageBox
+from qtpy.QtWidgets import QMessageBox
 
-from napping.napping import Napping, NappingException
+from napping._napping_application import NappingApplication
+from napping._napping_exception import NappingException
 
 try:
     from PIL import Image
@@ -15,25 +16,12 @@ if Image is not None:
 
 
 def main():
-    app = QApplication([])
-    source_viewer = napari.Viewer(title="napping [source]")
-    target_viewer = napari.Viewer(title="napping [target]")
+    app = NappingApplication()
     try:
-        controller = Napping(source_viewer, target_viewer)
-        controller.initialize()
-        if not controller.show_dialog():
-            QMessageBox.critical(
-                source_viewer.window.qt_viewer,
-                "napping error",
-                "File matching aborted or no matching files found",
-            )
-            return
+        app.exec_dialog()
     except NappingException as e:
-        QMessageBox.critical(
-            source_viewer.window.qt_viewer, "napping exception", str(e)
-        )
-        return
-    app.exec_()
+        QMessageBox.critical(None, "napping exception", str(e))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

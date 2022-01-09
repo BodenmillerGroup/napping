@@ -2,7 +2,7 @@ from enum import Enum, IntEnum
 from os import PathLike
 from pathlib import Path
 from typing import Optional, Union
-from qtpy.QtCore import Qt, QObject, QSettings
+from qtpy.QtCore import Qt, QSettings
 from qtpy.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -18,7 +18,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
 )
 
-from napping._qt._file_line_edit import FileLineEdit
+from napping.qt._file_line_edit import FileLineEdit
 
 
 class NappingDialog(QDialog):
@@ -47,9 +47,7 @@ class NappingDialog(QDialog):
     TRANSFORM_TYPE_SETTING = "registrationDialog/transformType"
     SOURCE_COORDS_PATH_SETTING = "registrationDialog/sourceCoords"
     SOURCE_COORDS_REGEX_SETTING = "registrationDialog/sourceCoordsRegex"
-    TRANSFORMED_COORDS_PATH_SETTING = (
-        "registrationDialog/transformedCoordsDest"
-    )
+    TRANSF_COORDS_PATH_SETTING = "registrationDialog/transformedCoordsDest"
     PRE_TRANSFORM_SETTING = "registrationDialog/preTransformFile"
     POST_TRANSFORM_SETTING = "registrationDialog/postTransformFile"
 
@@ -64,16 +62,17 @@ class NappingDialog(QDialog):
     DEFAULT_TRANSFORM_TYPE = TransformType.SIMILARITY
     DEFAULT_SOURCE_COORDS_PATH = ""
     DEFAULT_SOURCE_COORDS_REGEX = ""
-    DEFAULT_TRANSFORMED_COORDS_PATH = ""
+    DEFAULT_TRANSF_COORDS_PATH = ""
     DEFAULT_PRE_TRANSFORM = ""
     DEFAULT_POST_TRANSFORM = ""
 
-    def __init__(self, settings: QSettings, parent: Optional[QObject] = None):
-        super(NappingDialog, self).__init__(parent)
+    def __init__(self, **dialog_kwargs) -> None:
+        super(NappingDialog, self).__init__(**dialog_kwargs)
+        self._settings = QSettings("Bodenmiller Lab", "napping")
 
         selection_mode = NappingDialog.SelectionMode(
             int(
-                settings.value(
+                self._settings.value(
                     self.SELECTION_MODE_SETTING,
                     defaultValue=self.DEFAULT_SELECTION_MODE.value,
                 )
@@ -102,7 +101,7 @@ class NappingDialog(QDialog):
             lambda _: self.refresh()
         )
 
-        matching_strategy_str = settings.value(
+        matching_strategy_str = self._settings.value(
             self.MATCHING_STRATEGY_SETTING,
             defaultValue=self.DEFAULT_MATCHING_STRATEGY.value,
         )
@@ -116,7 +115,7 @@ class NappingDialog(QDialog):
         )
 
         source_img_path_str = str(
-            settings.value(
+            self._settings.value(
                 self.SOURCE_IMG_PATH_SETTING,
                 defaultValue=self.DEFAULT_SOURCE_IMG_PATH,
             )
@@ -133,7 +132,7 @@ class NappingDialog(QDialog):
         )
 
         source_regex = str(
-            settings.value(
+            self._settings.value(
                 self.SOURCE_IMG_REGEX_SETTING,
                 defaultValue=self.DEFAULT_SOURCE_IMG_REGEX,
             )
@@ -144,7 +143,7 @@ class NappingDialog(QDialog):
         self._source_regex_edit.textChanged.connect(lambda _: self.refresh())
 
         target_img_path_str = str(
-            settings.value(
+            self._settings.value(
                 self.TARGET_IMG_PATH_SETTING,
                 defaultValue=self.DEFAULT_TARGET_IMG_PATH,
             )
@@ -161,7 +160,7 @@ class NappingDialog(QDialog):
         )
 
         target_regex = str(
-            settings.value(
+            self._settings.value(
                 self.TARGET_IMG_REGEX_SETTING,
                 defaultValue=self.DEFAULT_TARGET_IMG_REGEX,
             )
@@ -172,7 +171,7 @@ class NappingDialog(QDialog):
         self._target_regex_edit.textChanged.connect(lambda _: self.refresh())
 
         control_points_path_str = str(
-            settings.value(
+            self._settings.value(
                 self.CONTROL_POINTS_PATH_SETTING,
                 defaultValue=self.DEFAULT_CONTROL_POINTS_PATH,
             )
@@ -187,7 +186,7 @@ class NappingDialog(QDialog):
         )
 
         joint_transform_path_str = str(
-            settings.value(
+            self._settings.value(
                 self.JOINT_TRANSFORM_PATH_SETTING,
                 defaultValue=self.DEFAULT_JOINT_TRANSFORM_PATH,
             )
@@ -202,7 +201,7 @@ class NappingDialog(QDialog):
         )
 
         transform_type_str = str(
-            settings.value(
+            self._settings.value(
                 self.TRANSFORM_TYPE_SETTING,
                 defaultValue=self.DEFAULT_TRANSFORM_TYPE,
             )
@@ -217,7 +216,7 @@ class NappingDialog(QDialog):
         )
 
         source_coords_path_str = str(
-            settings.value(
+            self._settings.value(
                 self.SOURCE_COORDS_PATH_SETTING,
                 defaultValue=self.DEFAULT_SOURCE_COORDS_PATH,
             )
@@ -234,7 +233,7 @@ class NappingDialog(QDialog):
         )
 
         source_coords_regex = str(
-            settings.value(
+            self._settings.value(
                 self.SOURCE_COORDS_REGEX_SETTING,
                 defaultValue=self.DEFAULT_SOURCE_COORDS_REGEX,
             )
@@ -246,23 +245,23 @@ class NappingDialog(QDialog):
             lambda _: self.refresh()
         )
 
-        transformed_coords_path_str = str(
-            settings.value(
-                self.TRANSFORMED_COORDS_PATH_SETTING,
-                defaultValue=self.DEFAULT_TRANSFORMED_COORDS_PATH,
+        transf_coords_path_str = str(
+            self._settings.value(
+                self.TRANSF_COORDS_PATH_SETTING,
+                defaultValue=self.DEFAULT_TRANSF_COORDS_PATH,
             )
         )
-        self._transformed_coords_path_edit = FileLineEdit(parent=self)
-        self._transformed_coords_path_edit.file_dialog.setWindowTitle(
-            "Select transformed coordinates destination"
+        self._transf_coords_path_edit = FileLineEdit(parent=self)
+        self._transf_coords_path_edit.file_dialog.setWindowTitle(
+            "Select transf. coordinates destination"
         )
-        self._transformed_coords_path_edit.setText(transformed_coords_path_str)
-        self._transformed_coords_path_edit.textChanged.connect(
+        self._transf_coords_path_edit.setText(transf_coords_path_str)
+        self._transf_coords_path_edit.textChanged.connect(
             lambda text: self.refresh(text)
         )
 
         pre_transform_file_str = str(
-            settings.value(
+            self._settings.value(
                 self.PRE_TRANSFORM_SETTING,
                 defaultValue=self.DEFAULT_PRE_TRANSFORM,
             )
@@ -283,7 +282,7 @@ class NappingDialog(QDialog):
         )
 
         post_transform_file_str = str(
-            settings.value(
+            self._settings.value(
                 self.POST_TRANSFORM_SETTING,
                 defaultValue=self.DEFAULT_POST_TRANSFORM,
             )
@@ -309,53 +308,7 @@ class NappingDialog(QDialog):
             self,
         )
         self._button_box.rejected.connect(self.reject)
-
-        @self._button_box.accepted.connect
-        def on_button_box_accepted():
-            settings.setValue(
-                self.SELECTION_MODE_SETTING, self.selection_mode.value
-            )
-            settings.setValue(
-                self.SOURCE_IMG_PATH_SETTING, str(self.source_img_path)
-            )
-            settings.setValue(self.SOURCE_IMG_REGEX_SETTING, self.source_regex)
-            settings.setValue(
-                self.TARGET_IMG_PATH_SETTING, str(self.target_img_path)
-            )
-            settings.setValue(self.TARGET_IMG_REGEX_SETTING, self.target_regex)
-            settings.setValue(
-                self.CONTROL_POINTS_PATH_SETTING, str(self.control_points_path)
-            )
-            settings.setValue(
-                self.JOINT_TRANSFORM_PATH_SETTING,
-                str(self.joint_transform_path),
-            )
-            settings.setValue(
-                self.TRANSFORM_TYPE_SETTING, self.transform_type.value
-            )
-            settings.setValue(
-                self.MATCHING_STRATEGY_SETTING, self.matching.value
-            )
-            settings.setValue(
-                self.SOURCE_COORDS_PATH_SETTING,
-                str(self.source_coords_path or ""),
-            )
-            settings.setValue(
-                self.SOURCE_COORDS_REGEX_SETTING, self.source_coords_regex
-            )
-            settings.setValue(
-                self.TRANSFORMED_COORDS_PATH_SETTING,
-                str(self.transformed_coords_path or ""),
-            )
-            settings.setValue(
-                self.PRE_TRANSFORM_SETTING, str(self.pre_transform_path or "")
-            )
-            settings.setValue(
-                self.POST_TRANSFORM_SETTING,
-                str(self.post_transform_path or ""),
-            )
-            settings.sync()
-            self.accept()
+        self._button_box.accepted.connect(self._on_button_box_accepted)
 
         required_group_box = QGroupBox(self)
         required_group_box_layout = QFormLayout()
@@ -405,7 +358,7 @@ class NappingDialog(QDialog):
             self._source_coords_regex_label, self._source_coords_regex_edit
         )
         optional_group_box_layout.addRow(
-            "Transformed coord. dest.:", self._transformed_coords_path_edit
+            "Transf. coord. dest.:", self._transf_coords_path_edit
         )
         optional_group_box_layout.addRow(
             "Pre-transform:", self._pre_transform_file_edit
@@ -431,181 +384,7 @@ class NappingDialog(QDialog):
         self.setMinimumWidth(600)
         self.refresh()
 
-    @property
-    def selection_mode(self) -> Optional["NappingDialog.SelectionMode"]:
-        selection_mode_value = self._selection_mode_buttons.checkedId()
-        if selection_mode_value >= 0:
-            return NappingDialog.SelectionMode(selection_mode_value)
-        return None
-
-    @property
-    def matching(self) -> "NappingDialog.Matching":
-        return NappingDialog.MatchingStrategy(
-            self._matching_strategy_combo_box.currentText()
-        )
-
-    @property
-    def source_img_path(self) -> Optional[Path]:
-        return self._source_img_path_edit.path
-
-    @property
-    def source_regex(self) -> str:
-        return self._source_regex_edit.text()
-
-    @property
-    def target_img_path(self) -> Optional[Path]:
-        return self._target_img_path_edit.path
-
-    @property
-    def target_regex(self) -> str:
-        return self._target_regex_edit.text()
-
-    @property
-    def control_points_path(self) -> Optional[Path]:
-        return self._control_points_path_edit.path
-
-    @property
-    def joint_transform_path(self) -> Optional[Path]:
-        return self._joint_transform_path_edit.path
-
-    @property
-    def transform_type(self) -> "NappingDialog.TransformType":
-        return NappingDialog.TransformType(
-            self._transform_type_combo_box.currentText()
-        )
-
-    @property
-    def source_coords_path(self) -> Optional[Path]:
-        return self._source_coords_path_edit.path
-
-    @property
-    def source_coords_regex(self) -> str:
-        return self._source_coords_regex_edit.text()
-
-    @property
-    def transformed_coords_path(self) -> Optional[Path]:
-        return self._transformed_coords_path_edit.path
-
-    @property
-    def pre_transform_path(self) -> Optional[Path]:
-        return self._pre_transform_file_edit.path
-
-    @property
-    def post_transform_path(self) -> Optional[Path]:
-        return self._post_transform_file_edit.path
-
-    @property
-    def is_valid(self) -> bool:
-        if self.selection_mode == NappingDialog.SelectionMode.FILE:
-            if (
-                self.source_img_path is None
-                or not self.source_img_path.is_file()
-            ):
-                return False
-            if (
-                self.target_img_path is None
-                or not self.target_img_path.is_file()
-            ):
-                return False
-            if (
-                self.control_points_path is None
-                or self.control_points_path.is_dir()
-            ):
-                return False
-            if (
-                self.joint_transform_path is None
-                or self.joint_transform_path.is_dir()
-            ):
-                return False
-            if (
-                self.source_coords_path is not None
-                and not self.source_coords_path.is_file()
-            ):
-                return False
-            if (
-                self.transformed_coords_path is not None
-                and self.control_points_path.is_dir()
-            ):
-                return False
-        elif self.selection_mode == NappingDialog.SelectionMode.DIR:
-            if (
-                self.source_img_path is None
-                or not self.source_img_path.is_dir()
-            ):
-                return False
-            if (
-                self.target_img_path is None
-                or not self.target_img_path.is_dir()
-            ):
-                return False
-            if (
-                self.control_points_path is None
-                or self.control_points_path.is_file()
-            ):
-                return False
-            if (
-                self.joint_transform_path is None
-                or self.joint_transform_path.is_file()
-            ):
-                return False
-            if (
-                self.source_coords_path is not None
-                and not self.source_coords_path.is_dir()
-            ):
-                return False
-            if (
-                self.transformed_coords_path is not None
-                and self.control_points_path.is_file()
-            ):
-                return False
-            if self.matching == NappingDialog.MatchingStrategy.REGEX:
-                if not self.source_regex:
-                    return False
-                if not self.target_regex:
-                    return False
-                if (
-                    self.source_coords_path is not None
-                    and not self.source_coords_regex
-                ):
-                    return False
-        else:
-            return False
-        if (
-            self.pre_transform_path is not None
-            and not self.pre_transform_path.is_file()
-        ):
-            return False
-        if (
-            self.post_transform_path is not None
-            and not self.post_transform_path.is_file()
-        ):
-            return False
-        if bool(self.source_coords_path) != bool(self.transformed_coords_path):
-            return False
-        if (
-            bool(self.pre_transform_path) or bool(self.post_transform_path)
-        ) and not bool(self.source_coords_path):
-            return False
-        unique_paths = {
-            self.source_img_path,
-            self.target_img_path,
-            self.control_points_path,
-            self.joint_transform_path,
-        }
-        if (
-            self.source_coords_path is not None
-            and self.transformed_coords_path is not None
-        ):
-            unique_paths.update(
-                {self.source_coords_path, self.transformed_coords_path}
-            )
-            if len(unique_paths) != 6:
-                return False
-        elif len(unique_paths) != 4:
-            return False
-        return True
-
-    def refresh(self, last_path: Union[str, PathLike, None] = None):
+    def refresh(self, last_path: Union[str, PathLike, None] = None) -> None:
         if last_path:
             directory = str(Path(last_path).parent)
             self._source_img_path_edit.file_dialog.setDirectory(directory)
@@ -613,9 +392,7 @@ class NappingDialog(QDialog):
             self._control_points_path_edit.file_dialog.setDirectory(directory)
             self._joint_transform_path_edit.file_dialog.setDirectory(directory)
             self._source_coords_path_edit.file_dialog.setDirectory(directory)
-            self._transformed_coords_path_edit.file_dialog.setDirectory(
-                directory
-            )
+            self._transf_coords_path_edit.file_dialog.setDirectory(directory)
             self._pre_transform_file_edit.file_dialog.setDirectory(directory)
             self._post_transform_file_edit.file_dialog.setDirectory(directory)
 
@@ -631,10 +408,10 @@ class NappingDialog(QDialog):
                 transform_name_filter = "Numpy files (*.npy)"
                 transform_default_suffix = ".npy"
                 source_coords_name_filter = (
-                    transformed_coords_name_filter
+                    transf_coords_name_filter
                 ) = "CSV files (*.csv)"
                 source_coords_default_suffix = (
-                    transformed_coords_default_suffix
+                    transf_coords_default_suffix
                 ) = ".csv"
                 show_dirs_only = False
             else:
@@ -644,11 +421,9 @@ class NappingDialog(QDialog):
                 control_points_default_suffix = None
                 transform_name_filter = None
                 transform_default_suffix = None
-                source_coords_name_filter = (
-                    transformed_coords_name_filter
-                ) = None
+                source_coords_name_filter = transf_coords_name_filter = None
                 source_coords_default_suffix = (
-                    transformed_coords_default_suffix
+                    transf_coords_default_suffix
                 ) = None
                 show_dirs_only = True
 
@@ -705,16 +480,16 @@ class NappingDialog(QDialog):
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._transformed_coords_path_edit.file_dialog.setFileMode(
+            self._transf_coords_path_edit.file_dialog.setFileMode(
                 any_file_mode
             )
-            self._transformed_coords_path_edit.file_dialog.setNameFilter(
-                transformed_coords_name_filter
+            self._transf_coords_path_edit.file_dialog.setNameFilter(
+                transf_coords_name_filter
             )
-            self._transformed_coords_path_edit.file_dialog.setDefaultSuffix(
-                transformed_coords_default_suffix
+            self._transf_coords_path_edit.file_dialog.setDefaultSuffix(
+                transf_coords_default_suffix
             )
-            self._transformed_coords_path_edit.file_dialog.setOption(
+            self._transf_coords_path_edit.file_dialog.setOption(
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
@@ -727,7 +502,7 @@ class NappingDialog(QDialog):
             self.selection_mode == NappingDialog.SelectionMode.DIR
         )
         regex_matching_strategy = (
-            self.matching == NappingDialog.MatchingStrategy.REGEX
+            self.matching_strategy == NappingDialog.MatchingStrategy.REGEX
         )
         self._source_regex_label.setEnabled(
             dir_selection_mode and regex_matching_strategy
@@ -749,5 +524,228 @@ class NappingDialog(QDialog):
         )
 
         self._button_box.button(QDialogButtonBox.StandardButton.Ok).setEnabled(
-            self.is_valid
+            self.is_valid()
         )
+
+    def is_valid(self) -> bool:
+        if self.selection_mode == NappingDialog.SelectionMode.FILE:
+            if (
+                self.source_img_path is None
+                or not self.source_img_path.is_file()
+            ):
+                return False
+            if (
+                self.target_img_path is None
+                or not self.target_img_path.is_file()
+            ):
+                return False
+            if (
+                self.control_points_path is None
+                or self.control_points_path.is_dir()
+            ):
+                return False
+            if (
+                self.joint_transform_path is None
+                or self.joint_transform_path.is_dir()
+            ):
+                return False
+            if (
+                self.source_coords_path is not None
+                and not self.source_coords_path.is_file()
+            ):
+                return False
+            if (
+                self.transf_coords_path is not None
+                and self.control_points_path.is_dir()
+            ):
+                return False
+        elif self.selection_mode == NappingDialog.SelectionMode.DIR:
+            if (
+                self.source_img_path is None
+                or not self.source_img_path.is_dir()
+            ):
+                return False
+            if (
+                self.target_img_path is None
+                or not self.target_img_path.is_dir()
+            ):
+                return False
+            if (
+                self.control_points_path is None
+                or self.control_points_path.is_file()
+            ):
+                return False
+            if (
+                self.joint_transform_path is None
+                or self.joint_transform_path.is_file()
+            ):
+                return False
+            if (
+                self.source_coords_path is not None
+                and not self.source_coords_path.is_dir()
+            ):
+                return False
+            if (
+                self.transf_coords_path is not None
+                and self.control_points_path.is_file()
+            ):
+                return False
+            if self.matching_strategy == NappingDialog.MatchingStrategy.REGEX:
+                if not self.source_regex:
+                    return False
+                if not self.target_regex:
+                    return False
+                if (
+                    self.source_coords_path is not None
+                    and not self.source_coords_regex
+                ):
+                    return False
+        else:
+            return False
+        if (
+            self.pre_transform_path is not None
+            and not self.pre_transform_path.is_file()
+        ):
+            return False
+        if (
+            self.post_transform_path is not None
+            and not self.post_transform_path.is_file()
+        ):
+            return False
+        if bool(self.source_coords_path) != bool(self.transf_coords_path):
+            return False
+        if (
+            bool(self.pre_transform_path) or bool(self.post_transform_path)
+        ) and not bool(self.source_coords_path):
+            return False
+        unique_paths = {
+            self.source_img_path,
+            self.target_img_path,
+            self.control_points_path,
+            self.joint_transform_path,
+        }
+        if (
+            self.source_coords_path is not None
+            and self.transf_coords_path is not None
+        ):
+            unique_paths.update(
+                {self.source_coords_path, self.transf_coords_path}
+            )
+            if len(unique_paths) != 6:
+                return False
+        elif len(unique_paths) != 4:
+            return False
+        return True
+
+    def _on_button_box_accepted(self) -> None:
+        self._settings.setValue(
+            self.SELECTION_MODE_SETTING, self.selection_mode.value
+        )
+        self._settings.setValue(
+            self.SOURCE_IMG_PATH_SETTING, str(self.source_img_path)
+        )
+        self._settings.setValue(
+            self.SOURCE_IMG_REGEX_SETTING, self.source_regex
+        )
+        self._settings.setValue(
+            self.TARGET_IMG_PATH_SETTING, str(self.target_img_path)
+        )
+        self._settings.setValue(
+            self.TARGET_IMG_REGEX_SETTING, self.target_regex
+        )
+        self._settings.setValue(
+            self.CONTROL_POINTS_PATH_SETTING, str(self.control_points_path)
+        )
+        self._settings.setValue(
+            self.JOINT_TRANSFORM_PATH_SETTING,
+            str(self.joint_transform_path),
+        )
+        self._settings.setValue(
+            self.TRANSFORM_TYPE_SETTING, self.transform_type.value
+        )
+        self._settings.setValue(
+            self.MATCHING_STRATEGY_SETTING, self.matching_strategy.value
+        )
+        self._settings.setValue(
+            self.SOURCE_COORDS_PATH_SETTING,
+            str(self.source_coords_path or ""),
+        )
+        self._settings.setValue(
+            self.SOURCE_COORDS_REGEX_SETTING, self.source_coords_regex
+        )
+        self._settings.setValue(
+            self.TRANSF_COORDS_PATH_SETTING,
+            str(self.transf_coords_path or ""),
+        )
+        self._settings.setValue(
+            self.PRE_TRANSFORM_SETTING, str(self.pre_transform_path or "")
+        )
+        self._settings.setValue(
+            self.POST_TRANSFORM_SETTING,
+            str(self.post_transform_path or ""),
+        )
+        self._settings.sync()
+        self.accept()
+
+    @property
+    def selection_mode(self) -> Optional["NappingDialog.SelectionMode"]:
+        selection_mode_value = self._selection_mode_buttons.checkedId()
+        if selection_mode_value >= 0:
+            return NappingDialog.SelectionMode(selection_mode_value)
+        return None
+
+    @property
+    def matching_strategy(self) -> "NappingDialog.MatchingStrategy":
+        return NappingDialog.MatchingStrategy(
+            self._matching_strategy_combo_box.currentText()
+        )
+
+    @property
+    def source_img_path(self) -> Optional[Path]:
+        return self._source_img_path_edit.get_path()
+
+    @property
+    def source_regex(self) -> str:
+        return self._source_regex_edit.text()
+
+    @property
+    def target_img_path(self) -> Optional[Path]:
+        return self._target_img_path_edit.get_path()
+
+    @property
+    def target_regex(self) -> str:
+        return self._target_regex_edit.text()
+
+    @property
+    def control_points_path(self) -> Optional[Path]:
+        return self._control_points_path_edit.get_path()
+
+    @property
+    def joint_transform_path(self) -> Optional[Path]:
+        return self._joint_transform_path_edit.get_path()
+
+    @property
+    def transform_type(self) -> "NappingDialog.TransformType":
+        return NappingDialog.TransformType(
+            self._transform_type_combo_box.currentText()
+        )
+
+    @property
+    def source_coords_path(self) -> Optional[Path]:
+        return self._source_coords_path_edit.get_path()
+
+    @property
+    def source_coords_regex(self) -> str:
+        return self._source_coords_regex_edit.text()
+
+    @property
+    def transf_coords_path(self) -> Optional[Path]:
+        return self._transf_coords_path_edit.get_path()
+
+    @property
+    def pre_transform_path(self) -> Optional[Path]:
+        return self._pre_transform_file_edit.get_path()
+
+    @property
+    def post_transform_path(self) -> Optional[Path]:
+        return self._post_transform_file_edit.get_path()
