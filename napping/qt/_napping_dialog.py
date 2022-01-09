@@ -694,58 +694,139 @@ class NappingDialog(QDialog):
             return NappingDialog.SelectionMode(selection_mode_value)
         return None
 
+    @selection_mode.setter
+    def selection_mode(
+        self, selection_mode: Optional["NappingDialog.SelectionMode"]
+    ) -> None:
+        if selection_mode is None:
+            selection_mode = self.DEFAULT_SELECTION_MODE
+        if selection_mode == NappingDialog.SelectionMode.FILE:
+            self._file_selection_mode_button.setChecked(True)
+        if selection_mode == NappingDialog.SelectionMode.DIR:
+            self._dir_selection_mode_button.setChecked(True)
+
     @property
-    def matching_strategy(self) -> "NappingDialog.MatchingStrategy":
-        return NappingDialog.MatchingStrategy(
-            self._matching_strategy_combo_box.currentText()
+    def matching_strategy(self) -> Optional["NappingDialog.MatchingStrategy"]:
+        try:
+            return NappingDialog.MatchingStrategy(
+                self._matching_strategy_combo_box.currentText()
+            )
+        except Exception:
+            return None
+
+    @matching_strategy.setter
+    def matching_strategy(
+        self, matching_strategy: Optional["NappingDialog.MatchingStrategy"]
+    ) -> None:
+        if matching_strategy is None:
+            matching_strategy = self.DEFAULT_MATCHING_STRATEGY
+        self._matching_strategy_combo_box.setCurrentText(
+            matching_strategy.value
         )
 
     @property
     def source_img_path(self) -> Optional[Path]:
         return self._source_img_path_edit.get_path()
 
+    @source_img_path.setter
+    def source_img_path(self, source_img_path: Optional[Path]) -> None:
+        self._source_img_path_edit.set_path(source_img_path)
+
     @property
-    def source_regex(self) -> str:
-        return self._source_regex_edit.text()
+    def source_regex(self) -> Optional[str]:
+        return self._source_regex_edit.text() or None
+
+    @source_regex.setter
+    def source_regex(self, source_regex: Optional[str]) -> None:
+        self._source_regex_edit.setText(source_regex or "")
 
     @property
     def target_img_path(self) -> Optional[Path]:
         return self._target_img_path_edit.get_path()
 
+    @target_img_path.setter
+    def target_img_path(self, target_img_path: Optional[Path]) -> None:
+        self._target_img_path_edit.set_path(target_img_path)
+
     @property
-    def target_regex(self) -> str:
-        return self._target_regex_edit.text()
+    def target_regex(self) -> Optional[str]:
+        return self._target_regex_edit.text() or None
+
+    @target_regex.setter
+    def target_regex(self, target_regex: Optional[str]) -> None:
+        self._target_regex_edit.setText(target_regex or "")
 
     @property
     def control_points_path(self) -> Optional[Path]:
         return self._control_points_path_edit.get_path()
 
+    @control_points_path.setter
+    def control_points_path(self, control_points_path: Optional[Path]) -> None:
+        self._control_points_path_edit.set_path(control_points_path)
+
     @property
     def joint_transform_path(self) -> Optional[Path]:
         return self._joint_transform_path_edit.get_path()
 
+    @joint_transform_path.setter
+    def joint_transform_path(
+        self, joint_transform_path: Optional[Path]
+    ) -> None:
+        self._joint_transform_path_edit.set_path(joint_transform_path)
+
     @property
-    def transform_type(self) -> "NappingDialog.TransformType":
-        return NappingDialog.TransformType(
-            self._transform_type_combo_box.currentText()
-        )
+    def transform_type(self) -> Optional["NappingDialog.TransformType"]:
+        try:
+            return NappingDialog.TransformType(
+                self._transform_type_combo_box.currentText()
+            )
+        except Exception:
+            return None
+
+    @transform_type.setter
+    def transform_type(
+        self, transform_type: Optional["NappingDialog.TransformType"]
+    ) -> None:
+        if transform_type is None:
+            transform_type = self.DEFAULT_TRANSFORM_TYPE
+        self._transform_type_combo_box.setCurrentText(transform_type.value)
 
     @property
     def source_coords_path(self) -> Optional[Path]:
         return self._source_coords_path_edit.get_path()
 
+    @source_coords_path.setter
+    def source_coords_path(self, source_coords_path: Optional[Path]) -> None:
+        self._source_coords_path_edit.set_path(source_coords_path)
+
     @property
-    def source_coords_regex(self) -> str:
-        return self._source_coords_regex_edit.text()
+    def source_coords_regex(self) -> Optional[str]:
+        return self._source_coords_regex_edit.text() or None
+
+    @source_coords_regex.setter
+    def source_coords_regex(self, source_coords_regex: Optional[str]) -> None:
+        self._source_coords_regex_edit.setText(source_coords_regex or "")
 
     @property
     def transf_coords_path(self) -> Optional[Path]:
         return self._transf_coords_path_edit.get_path()
 
+    @transf_coords_path.setter
+    def transf_coords_path(self, transf_coords_path: Optional[Path]) -> None:
+        self._transf_coords_path_edit.set_path(transf_coords_path)
+
     @property
     def pre_transform_path(self) -> Optional[Path]:
         return self._pre_transform_file_edit.get_path()
 
+    @pre_transform_path.setter
+    def pre_transform_path(self, pre_transform_path: Optional[Path]) -> None:
+        self._pre_transform_file_edit.set_path(pre_transform_path)
+
     @property
     def post_transform_path(self) -> Optional[Path]:
         return self._post_transform_file_edit.get_path()
+
+    @post_transform_path.setter
+    def post_transform_path(self, post_transform_path: Optional[Path]) -> None:
+        self._post_transform_file_edit.set_path(post_transform_path)

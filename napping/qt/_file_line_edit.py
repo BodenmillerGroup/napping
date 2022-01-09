@@ -16,6 +16,12 @@ class FileLineEdit(QLineEdit):
         if check_exists:
             self.textChanged.connect(self._on_text_changed)
 
+    def get_path(self) -> Optional[Path]:
+        return Path(self.text()) if self.text() else None
+
+    def set_path(self, path: Optional[Path]) -> None:
+        self.setText(str(path) if path is not None else "")
+
     def _on_browse_action_triggered(self, checked=False) -> None:
         path = self.get_path()
         if path is not None:
@@ -32,9 +38,6 @@ class FileLineEdit(QLineEdit):
             self.setStyleSheet("")
         else:
             self.setStyleSheet("background-color: #88ff0000")
-
-    def get_path(self) -> Optional[Path]:
-        return Path(self.text()) if self.text() else None
 
     @property
     def file_dialog(self) -> QFileDialog:

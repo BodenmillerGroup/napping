@@ -37,10 +37,10 @@ class NappingApplication:
         return_code = NappingApplication.RESTART_RETURN_CODE
         while return_code == NappingApplication.RESTART_RETURN_CODE:
             self._current_app = app or QApplication([])
-            self._current_source_viewer = self._create_viewer(
+            self._current_source_viewer = self._create_source_viewer(
                 self._navigator.current_source_img_file
             )
-            self._current_target_viewer = self._create_viewer(
+            self._current_target_viewer = self._create_target_viewer(
                 self._navigator.current_target_img_file
             )
             self._current_widget = self._create_widget()
@@ -77,7 +77,7 @@ class NappingApplication:
     def exec_dialog(self, app: Optional[QApplication] = None) -> None:
         if app is None:
             app = QApplication([])
-        dialog = NappingDialog()
+        dialog = self._create_dialog()
         if dialog.exec() == NappingDialog.DialogCode.Accepted:
             self._transform_type = {
                 NappingDialog.TransformType.EUCLIDEAN: EuclideanTransform,
@@ -225,7 +225,17 @@ class NappingApplication:
                 )
         return None
 
-    def _create_viewer(self, img_file: Union[str, PathLike]) -> NappingViewer:
+    def _create_dialog(self) -> NappingDialog:
+        return NappingDialog()
+
+    def _create_source_viewer(
+        self, img_file: Union[str, PathLike]
+    ) -> NappingViewer:
+        return NappingViewer(img_file)
+
+    def _create_target_viewer(
+        self, img_file: Union[str, PathLike]
+    ) -> NappingViewer:
         return NappingViewer(img_file)
 
     def _create_widget(self) -> NappingWidget:
