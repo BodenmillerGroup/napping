@@ -2,8 +2,8 @@ import sys
 
 from qtpy.QtWidgets import QMessageBox
 
-from napping._napping_application import NappingApplication
-from napping._napping_exception import NappingException
+from ._napping_application import NappingApplication
+from ._napping_exception import NappingException
 
 try:
     from PIL import Image

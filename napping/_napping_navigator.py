@@ -5,7 +5,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
-from napping._napping_exception import NappingException
+from ._napping_exception import NappingException
 
 
 class NappingNavigator:
@@ -79,9 +79,7 @@ class NappingNavigator:
                 self._source_img_files,
                 self._target_img_files,
                 self._source_coords_files,
-            ) = self._match_filename(
-                source_img_dir, target_img_dir, source_coords_dir
-            )
+            ) = self._match_filename(source_img_dir, target_img_dir, source_coords_dir)
         elif matching_strategy == NappingNavigator.MatchingStrategy.REGEX:
             (
                 self._source_img_files,
@@ -96,9 +94,7 @@ class NappingNavigator:
                 source_coords_regex,
             )
         else:
-            raise ValueError(
-                f"Unsupported file matching strategy: {matching_strategy}"
-            )
+            raise ValueError(f"Unsupported file matching strategy: {matching_strategy}")
         self._control_points_files = [
             control_points_dir / f"{target_img_file.stem}.csv"
             for target_img_file in self._target_img_files
@@ -138,8 +134,7 @@ class NappingNavigator:
         )
         if len(target_files) != len(source_files):
             raise NappingException(
-                "Number of target images does not match "
-                "the number of source images"
+                "Number of target images does not match " "the number of source images"
             )
         if source_coords_dir is not None:
             source_coords_files = sorted(
@@ -198,9 +193,7 @@ class NappingNavigator:
             return False
 
         def match_source_coords(source_coords_file: Path, source_file: Path):
-            source_coords_match = source_coords_pattern.search(
-                source_coords_file.name
-            )
+            source_coords_match = source_coords_pattern.search(source_coords_file.name)
             source_match = source_pattern.search(source_file.name)
             if source_coords_match is not None and source_match is not None:
                 return source_coords_match.group() == source_match.group()
@@ -337,18 +330,12 @@ class NappingNavigator:
 
     @property
     def current_source_coords_file(self) -> Optional[Path]:
-        if (
-            self._current_index is not None
-            and self._source_coords_files is not None
-        ):
+        if self._current_index is not None and self._source_coords_files is not None:
             return self._source_coords_files[self._current_index]
         return None
 
     @property
     def current_transf_coords_file(self) -> Optional[Path]:
-        if (
-            self._current_index is not None
-            and self._transf_coords_files is not None
-        ):
+        if self._current_index is not None and self._transf_coords_files is not None:
             return self._transf_coords_files[self._current_index]
         return None

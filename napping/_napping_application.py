@@ -12,8 +12,8 @@ from skimage.transform import (
 )
 from typing import Optional, Type, Union
 
-from napping._napping_navigator import NappingNavigator
-from napping.qt import NappingDialog, NappingWidget, NappingViewer
+from ._napping_navigator import NappingNavigator
+from .qt import NappingDialog, NappingWidget, NappingViewer
 
 
 class NappingApplication:
@@ -136,9 +136,7 @@ class NappingApplication:
         self._current_source_viewer.close()
         self._current_target_viewer.close()
         self._current_widget.close()
-        self._current_app.exit(
-            returnCode=NappingApplication.RESTART_RETURN_CODE
-        )
+        self._current_app.exit(returnCode=NappingApplication.RESTART_RETURN_CODE)
         self._current_app = None
         self._current_widget = None
         self._current_source_viewer = None
@@ -148,13 +146,9 @@ class NappingApplication:
         if self._current_transform is not None:
             current_joint_transform = self._current_transform
             if self._pre_transform is not None:
-                current_joint_transform = (
-                    current_joint_transform @ self._pre_transform
-                )
+                current_joint_transform = current_joint_transform @ self._pre_transform
             if self._post_transform is not None:
-                current_joint_transform = (
-                    self._post_transform @ current_joint_transform
-                )
+                current_joint_transform = self._post_transform @ current_joint_transform
             return current_joint_transform
         return None
 
@@ -210,32 +204,21 @@ class NappingApplication:
     ) -> Optional[np.ndarray]:
         if self._current_transform is not None:
             current_control_points = self.get_current_control_points()
-            if (
-                current_control_points is not None
-                and not current_control_points.empty
-            ):
+            if current_control_points is not None and not current_control_points.empty:
                 tf = self._transform_type(self._current_transform)
                 return tf.residuals(
-                    current_control_points.loc[
-                        :, ["x_source", "y_source"]
-                    ].values,
-                    current_control_points.loc[
-                        :, ["x_target", "y_target"]
-                    ].values,
+                    current_control_points.loc[:, ["x_source", "y_source"]].values,
+                    current_control_points.loc[:, ["x_target", "y_target"]].values,
                 )
         return None
 
     def _create_dialog(self) -> NappingDialog:
         return NappingDialog()
 
-    def _create_source_viewer(
-        self, img_file: Union[str, PathLike]
-    ) -> NappingViewer:
+    def _create_source_viewer(self, img_file: Union[str, PathLike]) -> NappingViewer:
         return NappingViewer(img_file)
 
-    def _create_target_viewer(
-        self, img_file: Union[str, PathLike]
-    ) -> NappingViewer:
+    def _create_target_viewer(self, img_file: Union[str, PathLike]) -> NappingViewer:
         return NappingViewer(img_file)
 
     def _create_widget(self) -> NappingWidget:

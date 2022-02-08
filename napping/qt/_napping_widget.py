@@ -16,7 +16,7 @@ from qtpy.QtWidgets import (
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from napping._napping_application import NappingApplication
+    from .. import NappingApplication
 
 
 class ReadonlyQLineEdit(QLineEdit):
@@ -60,26 +60,16 @@ class NappingWidget(QWidget):
         files_box = QGroupBox(parent=self)
         files_box_layout = QFormLayout()
         files_box_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-        files_box_layout.setRowWrapPolicy(
-            QFormLayout.RowWrapPolicy.DontWrapRows
-        )
+        files_box_layout.setRowWrapPolicy(QFormLayout.RowWrapPolicy.DontWrapRows)
         files_box_layout.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
         files_box_layout.addRow("Source image:", self._source_img_file_label)
         files_box_layout.addRow("Target image:", self._target_img_file_label)
-        files_box_layout.addRow(
-            "Control points:", self._control_points_file_label
-        )
-        files_box_layout.addRow(
-            "Joint transform:", self._joint_transform_file_label
-        )
-        files_box_layout.addRow(
-            "Source coords:", self._source_coords_file_label
-        )
-        files_box_layout.addRow(
-            "Transf. coords:", self._transf_coords_file_label
-        )
+        files_box_layout.addRow("Control points:", self._control_points_file_label)
+        files_box_layout.addRow("Joint transform:", self._joint_transform_file_label)
+        files_box_layout.addRow("Source coords:", self._source_coords_file_label)
+        files_box_layout.addRow("Transf. coords:", self._transf_coords_file_label)
         files_box.setLayout(files_box_layout)
         layout.addWidget(files_box)
 
@@ -145,9 +135,7 @@ class NappingWidget(QWidget):
             self._progress_label.setText(None)
         current_control_points = self._app.get_current_control_points()
         if current_control_points is not None:
-            self._point_count_label.setText(
-                str(len(current_control_points.index))
-            )
+            self._point_count_label.setText(str(len(current_control_points.index)))
         else:
             self._point_count_label.setText(None)
         current_control_points_residuals = (

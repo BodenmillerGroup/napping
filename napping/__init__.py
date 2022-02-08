@@ -3,8 +3,9 @@ try:
 except ImportError:
     __version__ = "unknown"
 
-from napping._napping_application import NappingApplication
-from napping._napping_exception import NappingException
-from napping._napping_navigator import NappingNavigator
+from ._napping_application import NappingApplication
+from ._napping_exception import NappingException
+from ._napping_navigator import NappingNavigator
+
 
 __all__ = ["NappingApplication", "NappingException", "NappingNavigator"]

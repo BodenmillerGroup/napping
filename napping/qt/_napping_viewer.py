@@ -1,8 +1,7 @@
-import numpy as np
 import pandas as pd
 
 from napari.layers import Image, Points
-from napari.layers.utils.text_manager import TextManager
+from napari.layers.utils.layer_utils import features_to_pandas_dataframe
 from napari.viewer import Viewer
 from os import PathLike
 from pathlib import Path
@@ -13,24 +12,8 @@ class NappingViewer:
     ControlPointsChangedHandler = Callable[
         ["NappingViewer", Optional[pd.DataFrame]], None
     ]
-    _POINTS_LAYER_ARGS = {
-        # https://github.com/napari/napari/issues/2115
-        "properties": {"id": np.arange(1, 1000)},
-        "text": {
-            "text": "id",
-            "anchor": "upper_left",
-            "color": "red",
-            "translation": (0, 20),
-        },
-        "symbol": "cross",
-        "edge_width": 0,
-        "face_color": "red",
-        "name": "Control points",
-    }
 
-    def __init__(
-        self, img_file: Union[str, PathLike], **viewer_kwargs
-    ) -> None:
+    def __init__(self, img_file: Union[str, PathLike], **viewer_kwargs) -> None:
         self._control_points_changed_handlers: List[
             NappingViewer.ControlPointsChangedHandler
         ] = []
@@ -46,9 +29,10 @@ class NappingViewer:
 
     def get_control_points(self) -> Optional[pd.DataFrame]:
         if self._points_layer is not None:
+            features = features_to_pandas_dataframe(self._points_layer.features)
             return pd.DataFrame(
                 data=self._points_layer.data[:, ::-1],
-                index=self._points_layer.properties["id"],
+                index=features["id"].values,
                 columns=["x", "y"],
             )
         return None
@@ -57,9 +41,9 @@ class NappingViewer:
         if self._points_layer is None:
             raise RuntimeError("points layer is None")
         self._points_layer.data = value.loc[:, ["y", "x"]].values
-        properties = self._points_layer.properties
-        properties["id"] = value.index.values
-        self._points_layer.properties = properties
+        features = features_to_pandas_dataframe(self._points_layer.features).copy()
+        features["id"] = value.index.values
+        self._points_layer.features = features
         self._points_layer.refresh()
 
     def _load_image_layers(self, img_file: Path) -> List[Image]:
@@ -73,14 +57,21 @@ class NappingViewer:
         return self._viewer.open(str(img_file), layer_type="image")
 
     def _create_points_layer(self) -> Points:
-        points_layer = self._viewer.add_points(**self._POINTS_LAYER_ARGS)
+        points_layer = self._viewer.add_points(
+            features=pd.DataFrame(columns=["id"]),
+            text={
+                "text": "id",
+                "anchor": "upper_left",
+                "color": "red",
+                "translation": (0, 20),
+            },
+            symbol="cross",
+            edge_width=0,
+            face_color="red",
+            name="Control points",
+        )
         points_layer.mode = "add"
-        points_layer.mouse_drag_callbacks.append(
-            self._on_points_layer_mouse_drag
-        )
-        points_layer.events.current_properties.connect(
-            self._on_points_layer_current_properties_changed
-        )
+        points_layer.mouse_drag_callbacks.append(self._on_points_layer_mouse_drag)
         points_layer.events.data.connect(self._on_points_layer_data_changed)
         return points_layer
 
@@ -88,26 +79,13 @@ class NappingViewer:
         # https://github.com/napari/napari/issues/2259
         if layer.mode == "add":
             layer.current_properties["id"][0] = (
-                max(layer.properties["id"], default=0) + 1
+                max(layer.features["id"].tolist(), default=0) + 1
             )
         elif layer.mode == "select":
             yield
             while event.type == "mouse_move":
                 yield
             self._handle_control_points_changed()
-
-    def _on_points_layer_current_properties_changed(self, _) -> None:
-        # https://github.com/napari/napari/issues/2115
-        text_args = self._POINTS_LAYER_ARGS["text"]
-        if not isinstance(text_args, dict):
-            text_args = {"text": text_args}
-        n_text = len(self._points_layer.data)
-        self._points_layer._text = TextManager(
-            **text_args,
-            n_text=n_text,
-            properties=self._points_layer.properties,
-        )
-        self._points_layer.refresh_text()
 
     def _on_points_layer_data_changed(self, _) -> None:
         # called when control points are added or deleted; for dragging, see

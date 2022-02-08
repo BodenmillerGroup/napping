@@ -18,7 +18,7 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
 )
 
-from napping.qt._file_line_edit import FileLineEdit
+from ._file_line_edit import FileLineEdit
 
 
 class NappingDialog(QDialog):
@@ -78,9 +78,7 @@ class NappingDialog(QDialog):
                 )
             )
         )
-        self._file_selection_mode_button = QRadioButton(
-            "Single file pair", self
-        )
+        self._file_selection_mode_button = QRadioButton("Single file pair", self)
         self._file_selection_mode_button.setChecked(
             selection_mode == NappingDialog.SelectionMode.FILE
         )
@@ -97,9 +95,7 @@ class NappingDialog(QDialog):
         self._selection_mode_buttons.addButton(
             self._dir_selection_mode_button, NappingDialog.SelectionMode.DIR
         )
-        self._selection_mode_buttons.buttonClicked.connect(
-            lambda _: self.refresh()
-        )
+        self._selection_mode_buttons.buttonClicked.connect(lambda _: self.refresh())
 
         matching_strategy_str = self._settings.value(
             self.MATCHING_STRATEGY_SETTING,
@@ -120,16 +116,10 @@ class NappingDialog(QDialog):
                 defaultValue=self.DEFAULT_SOURCE_IMG_PATH,
             )
         )
-        self._source_img_path_edit = FileLineEdit(
-            check_exists=True, parent=self
-        )
-        self._source_img_path_edit.file_dialog.setWindowTitle(
-            "Select source image(s)"
-        )
+        self._source_img_path_edit = FileLineEdit(check_exists=True, parent=self)
+        self._source_img_path_edit.file_dialog.setWindowTitle("Select source image(s)")
         self._source_img_path_edit.setText(source_img_path_str)
-        self._source_img_path_edit.textChanged.connect(
-            lambda text: self.refresh(text)
-        )
+        self._source_img_path_edit.textChanged.connect(lambda text: self.refresh(text))
 
         source_regex = str(
             self._settings.value(
@@ -148,16 +138,10 @@ class NappingDialog(QDialog):
                 defaultValue=self.DEFAULT_TARGET_IMG_PATH,
             )
         )
-        self._target_img_path_edit = FileLineEdit(
-            check_exists=True, parent=self
-        )
-        self._target_img_path_edit.file_dialog.setWindowTitle(
-            "Select target image(s)"
-        )
+        self._target_img_path_edit = FileLineEdit(check_exists=True, parent=self)
+        self._target_img_path_edit.file_dialog.setWindowTitle("Select target image(s)")
         self._target_img_path_edit.setText(target_img_path_str)
-        self._target_img_path_edit.textChanged.connect(
-            lambda text: self.refresh(text)
-        )
+        self._target_img_path_edit.textChanged.connect(lambda text: self.refresh(text))
 
         target_regex = str(
             self._settings.value(
@@ -221,9 +205,7 @@ class NappingDialog(QDialog):
                 defaultValue=self.DEFAULT_SOURCE_COORDS_PATH,
             )
         )
-        self._source_coords_path_edit = FileLineEdit(
-            check_exists=True, parent=self
-        )
+        self._source_coords_path_edit = FileLineEdit(check_exists=True, parent=self)
         self._source_coords_path_edit.file_dialog.setWindowTitle(
             "Select source coordinates"
         )
@@ -241,9 +223,7 @@ class NappingDialog(QDialog):
         self._source_coords_regex_label = QLabel("        RegEx:")
         self._source_coords_regex_edit = QLineEdit(self)
         self._source_coords_regex_edit.setText(source_coords_regex)
-        self._source_coords_regex_edit.textChanged.connect(
-            lambda _: self.refresh()
-        )
+        self._source_coords_regex_edit.textChanged.connect(lambda _: self.refresh())
 
         transf_coords_path_str = str(
             self._settings.value(
@@ -267,16 +247,12 @@ class NappingDialog(QDialog):
             )
         )
         self._pre_transform_file_edit = FileLineEdit(parent=self)
-        self._pre_transform_file_edit.file_dialog.setWindowTitle(
-            "Select pre-transform"
-        )
+        self._pre_transform_file_edit.file_dialog.setWindowTitle("Select pre-transform")
         self._pre_transform_file_edit.setText(pre_transform_file_str)
         self._pre_transform_file_edit.file_dialog.setFileMode(
             QFileDialog.FileMode.ExistingFile
         )
-        self._pre_transform_file_edit.file_dialog.setNameFilter(
-            "Numpy files (*.npy)"
-        )
+        self._pre_transform_file_edit.file_dialog.setNameFilter("Numpy files (*.npy)")
         self._pre_transform_file_edit.textChanged.connect(
             lambda text: self.refresh(text)
         )
@@ -294,17 +270,14 @@ class NappingDialog(QDialog):
         self._post_transform_file_edit.file_dialog.setFileMode(
             QFileDialog.FileMode.ExistingFile
         )
-        self._post_transform_file_edit.file_dialog.setNameFilter(
-            "Numpy files (*.npy)"
-        )
+        self._post_transform_file_edit.file_dialog.setNameFilter("Numpy files (*.npy)")
         self._post_transform_file_edit.setText(post_transform_file_str)
         self._post_transform_file_edit.textChanged.connect(
             lambda text: self.refresh(text)
         )
 
         self._button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel,
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             self,
         )
         self._button_box.rejected.connect(self.reject)
@@ -319,15 +292,11 @@ class NappingDialog(QDialog):
         required_group_box_layout.setFieldGrowthPolicy(
             QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
         )
-        required_group_box_layout.addRow(
-            "Source image(s):", self._source_img_path_edit
-        )
+        required_group_box_layout.addRow("Source image(s):", self._source_img_path_edit)
         required_group_box_layout.addRow(
             self._source_regex_label, self._source_regex_edit
         )
-        required_group_box_layout.addRow(
-            "Target image(s):", self._target_img_path_edit
-        )
+        required_group_box_layout.addRow("Target image(s):", self._target_img_path_edit)
         required_group_box_layout.addRow(
             self._target_regex_label, self._target_regex_edit
         )
@@ -410,9 +379,7 @@ class NappingDialog(QDialog):
                 source_coords_name_filter = (
                     transf_coords_name_filter
                 ) = "CSV files (*.csv)"
-                source_coords_default_suffix = (
-                    transf_coords_default_suffix
-                ) = ".csv"
+                source_coords_default_suffix = transf_coords_default_suffix = ".csv"
                 show_dirs_only = False
             else:
                 any_file_mode = QFileDialog.FileMode.Directory
@@ -422,28 +389,20 @@ class NappingDialog(QDialog):
                 transform_name_filter = None
                 transform_default_suffix = None
                 source_coords_name_filter = transf_coords_name_filter = None
-                source_coords_default_suffix = (
-                    transf_coords_default_suffix
-                ) = None
+                source_coords_default_suffix = transf_coords_default_suffix = None
                 show_dirs_only = True
 
-            self._source_img_path_edit.file_dialog.setFileMode(
-                existing_file_mode
-            )
+            self._source_img_path_edit.file_dialog.setFileMode(existing_file_mode)
             self._source_img_path_edit.file_dialog.setOption(
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._target_img_path_edit.file_dialog.setFileMode(
-                existing_file_mode
-            )
+            self._target_img_path_edit.file_dialog.setFileMode(existing_file_mode)
             self._target_img_path_edit.file_dialog.setOption(
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._control_points_path_edit.file_dialog.setFileMode(
-                any_file_mode
-            )
+            self._control_points_path_edit.file_dialog.setFileMode(any_file_mode)
             self._control_points_path_edit.file_dialog.setNameFilter(
                 control_points_name_filter
             )
@@ -454,9 +413,7 @@ class NappingDialog(QDialog):
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._joint_transform_path_edit.file_dialog.setFileMode(
-                any_file_mode
-            )
+            self._joint_transform_path_edit.file_dialog.setFileMode(any_file_mode)
             self._joint_transform_path_edit.file_dialog.setNameFilter(
                 transform_name_filter
             )
@@ -467,9 +424,7 @@ class NappingDialog(QDialog):
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._source_coords_path_edit.file_dialog.setFileMode(
-                existing_file_mode
-            )
+            self._source_coords_path_edit.file_dialog.setFileMode(existing_file_mode)
             self._source_coords_path_edit.file_dialog.setNameFilter(
                 source_coords_name_filter
             )
@@ -480,9 +435,7 @@ class NappingDialog(QDialog):
                 QFileDialog.Option.ShowDirsOnly, show_dirs_only
             )
 
-            self._transf_coords_path_edit.file_dialog.setFileMode(
-                any_file_mode
-            )
+            self._transf_coords_path_edit.file_dialog.setFileMode(any_file_mode)
             self._transf_coords_path_edit.file_dialog.setNameFilter(
                 transf_coords_name_filter
             )
@@ -498,9 +451,7 @@ class NappingDialog(QDialog):
         else:
             self._matching_strategy_combo_box.setEnabled(False)
 
-        dir_selection_mode = (
-            self.selection_mode == NappingDialog.SelectionMode.DIR
-        )
+        dir_selection_mode = self.selection_mode == NappingDialog.SelectionMode.DIR
         regex_matching_strategy = (
             self.matching_strategy == NappingDialog.MatchingStrategy.REGEX
         )
@@ -529,25 +480,13 @@ class NappingDialog(QDialog):
 
     def is_valid(self) -> bool:
         if self.selection_mode == NappingDialog.SelectionMode.FILE:
-            if (
-                self.source_img_path is None
-                or not self.source_img_path.is_file()
-            ):
+            if self.source_img_path is None or not self.source_img_path.is_file():
                 return False
-            if (
-                self.target_img_path is None
-                or not self.target_img_path.is_file()
-            ):
+            if self.target_img_path is None or not self.target_img_path.is_file():
                 return False
-            if (
-                self.control_points_path is None
-                or self.control_points_path.is_dir()
-            ):
+            if self.control_points_path is None or self.control_points_path.is_dir():
                 return False
-            if (
-                self.joint_transform_path is None
-                or self.joint_transform_path.is_dir()
-            ):
+            if self.joint_transform_path is None or self.joint_transform_path.is_dir():
                 return False
             if (
                 self.source_coords_path is not None
@@ -560,25 +499,13 @@ class NappingDialog(QDialog):
             ):
                 return False
         elif self.selection_mode == NappingDialog.SelectionMode.DIR:
-            if (
-                self.source_img_path is None
-                or not self.source_img_path.is_dir()
-            ):
+            if self.source_img_path is None or not self.source_img_path.is_dir():
                 return False
-            if (
-                self.target_img_path is None
-                or not self.target_img_path.is_dir()
-            ):
+            if self.target_img_path is None or not self.target_img_path.is_dir():
                 return False
-            if (
-                self.control_points_path is None
-                or self.control_points_path.is_file()
-            ):
+            if self.control_points_path is None or self.control_points_path.is_file():
                 return False
-            if (
-                self.joint_transform_path is None
-                or self.joint_transform_path.is_file()
-            ):
+            if self.joint_transform_path is None or self.joint_transform_path.is_file():
                 return False
             if (
                 self.source_coords_path is not None
@@ -595,10 +522,7 @@ class NappingDialog(QDialog):
                     return False
                 if not self.target_regex:
                     return False
-                if (
-                    self.source_coords_path is not None
-                    and not self.source_coords_regex
-                ):
+                if self.source_coords_path is not None and not self.source_coords_regex:
                     return False
         else:
             return False
@@ -624,13 +548,8 @@ class NappingDialog(QDialog):
             self.control_points_path,
             self.joint_transform_path,
         }
-        if (
-            self.source_coords_path is not None
-            and self.transf_coords_path is not None
-        ):
-            unique_paths.update(
-                {self.source_coords_path, self.transf_coords_path}
-            )
+        if self.source_coords_path is not None and self.transf_coords_path is not None:
+            unique_paths.update({self.source_coords_path, self.transf_coords_path})
             if len(unique_paths) != 6:
                 return False
         elif len(unique_paths) != 4:
@@ -638,21 +557,11 @@ class NappingDialog(QDialog):
         return True
 
     def _on_button_box_accepted(self) -> None:
-        self._settings.setValue(
-            self.SELECTION_MODE_SETTING, self.selection_mode.value
-        )
-        self._settings.setValue(
-            self.SOURCE_IMG_PATH_SETTING, str(self.source_img_path)
-        )
-        self._settings.setValue(
-            self.SOURCE_IMG_REGEX_SETTING, self.source_regex
-        )
-        self._settings.setValue(
-            self.TARGET_IMG_PATH_SETTING, str(self.target_img_path)
-        )
-        self._settings.setValue(
-            self.TARGET_IMG_REGEX_SETTING, self.target_regex
-        )
+        self._settings.setValue(self.SELECTION_MODE_SETTING, self.selection_mode.value)
+        self._settings.setValue(self.SOURCE_IMG_PATH_SETTING, str(self.source_img_path))
+        self._settings.setValue(self.SOURCE_IMG_REGEX_SETTING, self.source_regex)
+        self._settings.setValue(self.TARGET_IMG_PATH_SETTING, str(self.target_img_path))
+        self._settings.setValue(self.TARGET_IMG_REGEX_SETTING, self.target_regex)
         self._settings.setValue(
             self.CONTROL_POINTS_PATH_SETTING, str(self.control_points_path)
         )
@@ -660,9 +569,7 @@ class NappingDialog(QDialog):
             self.JOINT_TRANSFORM_PATH_SETTING,
             str(self.joint_transform_path),
         )
-        self._settings.setValue(
-            self.TRANSFORM_TYPE_SETTING, self.transform_type.value
-        )
+        self._settings.setValue(self.TRANSFORM_TYPE_SETTING, self.transform_type.value)
         self._settings.setValue(
             self.MATCHING_STRATEGY_SETTING, self.matching_strategy.value
         )
@@ -720,9 +627,7 @@ class NappingDialog(QDialog):
     ) -> None:
         if matching_strategy is None:
             matching_strategy = self.DEFAULT_MATCHING_STRATEGY
-        self._matching_strategy_combo_box.setCurrentText(
-            matching_strategy.value
-        )
+        self._matching_strategy_combo_box.setCurrentText(matching_strategy.value)
 
     @property
     def source_img_path(self) -> Optional[Path]:
@@ -769,9 +674,7 @@ class NappingDialog(QDialog):
         return self._joint_transform_path_edit.get_path()
 
     @joint_transform_path.setter
-    def joint_transform_path(
-        self, joint_transform_path: Optional[Path]
-    ) -> None:
+    def joint_transform_path(self, joint_transform_path: Optional[Path]) -> None:
         self._joint_transform_path_edit.set_path(joint_transform_path)
 
     @property
