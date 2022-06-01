@@ -1,5 +1,6 @@
-import numpy as np
+from typing import TYPE_CHECKING
 
+import numpy as np
 from qtpy.QtCore import Qt
 from qtpy.QtWidgets import (
     QFormLayout,
@@ -12,8 +13,6 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .. import NappingApplication

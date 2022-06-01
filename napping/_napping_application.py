@@ -1,8 +1,9 @@
-import numpy as np
-import pandas as pd
-
 from contextlib import contextmanager
 from os import PathLike
+from typing import Optional, Type, Union
+
+import numpy as np
+import pandas as pd
 from qtpy.QtWidgets import QApplication
 from skimage.transform import (
     AffineTransform,
@@ -10,10 +11,9 @@ from skimage.transform import (
     ProjectiveTransform,
     SimilarityTransform,
 )
-from typing import Optional, Type, Union
 
 from ._napping_navigator import NappingNavigator
-from .qt import NappingDialog, NappingWidget, NappingViewer
+from .qt import NappingDialog, NappingViewer, NappingWidget
 
 
 class NappingApplication:

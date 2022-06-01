@@ -1,5 +1,4 @@
 import re
-
 from enum import IntEnum
 from os import PathLike
 from pathlib import Path

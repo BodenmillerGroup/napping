@@ -1,6 +1,7 @@
 from pathlib import Path
-from qtpy.QtWidgets import QFileDialog, QLineEdit, QStyle
 from typing import Optional
+
+from qtpy.QtWidgets import QFileDialog, QLineEdit, QStyle
 
 
 class FileLineEdit(QLineEdit):

@@ -2,7 +2,8 @@ from enum import Enum, IntEnum
 from os import PathLike
 from pathlib import Path
 from typing import Optional, Union
-from qtpy.QtCore import Qt, QSettings
+
+from qtpy.QtCore import QSettings, Qt
 from qtpy.QtWidgets import (
     QButtonGroup,
     QComboBox,

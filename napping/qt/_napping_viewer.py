@@ -1,11 +1,11 @@
-import pandas as pd
-
-from napari.layers import Image, Points
-from napari.layers.utils.layer_utils import features_to_pandas_dataframe
-from napari.viewer import Viewer
 from os import PathLike
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence, Union
+
+import pandas as pd
+from napari.layers import Image, Points
+from napari.layers.utils.layer_utils import features_to_pandas_dataframe
+from napari.viewer import Viewer
 
 
 class NappingViewer:
