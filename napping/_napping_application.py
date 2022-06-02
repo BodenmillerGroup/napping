@@ -183,10 +183,10 @@ class NappingApplication:
             if current_control_points is not None:
                 current_source_control_points = current_control_points.loc[
                     :, ["x_source", "y_source"]
-                ]
+                ].copy()
                 current_target_control_points = current_control_points.loc[
                     :, ["x_target", "y_target"]
-                ]
+                ].copy()
                 current_source_control_points.columns = ["x", "y"]
                 current_target_control_points.columns = ["x", "y"]
                 self._current_source_viewer.set_control_points(
@@ -207,8 +207,8 @@ class NappingApplication:
             if current_control_points is not None and not current_control_points.empty:
                 tf = self._transform_type(self._current_transform)
                 return tf.residuals(
-                    current_control_points.loc[:, ["x_source", "y_source"]].values,
-                    current_control_points.loc[:, ["x_target", "y_target"]].values,
+                    current_control_points.loc[:, ["x_source", "y_source"]].to_numpy(),
+                    current_control_points.loc[:, ["x_target", "y_target"]].to_numpy(),
                 )
         return None
 
@@ -254,8 +254,8 @@ class NappingApplication:
         if current_control_points.shape[0] >= 3:
             tf = self._transform_type()
             if tf.estimate(
-                current_control_points.loc[:, ["x_source", "y_source"]].values,
-                current_control_points.loc[:, ["x_target", "y_target"]].values,
+                current_control_points.loc[:, ["x_source", "y_source"]].to_numpy(),
+                current_control_points.loc[:, ["x_target", "y_target"]].to_numpy(),
             ):
                 self._current_transform = tf.params
 
@@ -267,7 +267,7 @@ class NappingApplication:
             and current_joint_transform is not None
         ):
             x = np.ones((self._current_source_coords.shape[0], 3))
-            x[:, :2] = self._current_source_coords.loc[:, ["X", "Y"]].values
+            x[:, :2] = self._current_source_coords.loc[:, ["X", "Y"]].to_numpy()
             self._current_transf_coords = self._current_source_coords.copy()
             self._current_transf_coords.loc[:, ["X", "Y"]] = (
                 current_joint_transform @ x.T

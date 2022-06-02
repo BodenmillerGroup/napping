@@ -32,7 +32,7 @@ class NappingViewer:
             features = features_to_pandas_dataframe(self._points_layer.features)
             return pd.DataFrame(
                 data=self._points_layer.data[:, ::-1],
-                index=features["id"].values,
+                index=features["id"].to_numpy(),
                 columns=["x", "y"],
             )
         return None
@@ -40,9 +40,9 @@ class NappingViewer:
     def set_control_points(self, value: pd.DataFrame) -> None:
         if self._points_layer is None:
             raise RuntimeError("points layer is None")
-        self._points_layer.data = value.loc[:, ["y", "x"]].values
+        self._points_layer.data = value.loc[:, ["y", "x"]].to_numpy()
         features = features_to_pandas_dataframe(self._points_layer.features).copy()
-        features["id"] = value.index.values
+        features["id"] = value.index.to_numpy()
         self._points_layer.features = features
         self._points_layer.refresh()
 
