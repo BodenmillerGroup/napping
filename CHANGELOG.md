@@ -34,10 +34,10 @@ Updated documentation
 Last release before introducing this changelog
 
 
-[v0.2.3]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.2.2...v0.2.3
-[v0.2.2]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.2.1...v0.2.2
-[v0.2.1]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.2.0...v0.2.1
-[v0.2.0]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.1.8...v0.2.0
-[v0.1.8]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.1.7...v0.1.8
-[v0.1.7]: https://github.com/BodenmillerGroup/napari-imc/compare/v0.1.6...v0.1.7
+[v0.2.3]: https://github.com/BodenmillerGroup/napping/compare/v0.2.2...v0.2.3
+[v0.2.2]: https://github.com/BodenmillerGroup/napping/compare/v0.2.1...v0.2.2
+[v0.2.1]: https://github.com/BodenmillerGroup/napping/compare/v0.2.0...v0.2.1
+[v0.2.0]: https://github.com/BodenmillerGroup/napping/compare/v0.1.8...v0.2.0
+[v0.1.8]: https://github.com/BodenmillerGroup/napping/compare/v0.1.7...v0.1.8
+[v0.1.7]: https://github.com/BodenmillerGroup/napping/compare/v0.1.6...v0.1.7
 [v0.1.6]: https://github.com/BodenmillerGroup/napping/releases/tag/v0.1.6
