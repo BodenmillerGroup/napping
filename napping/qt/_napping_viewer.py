@@ -54,7 +54,7 @@ class NappingViewer:
 
             img = imread(img_file, exifrotate=False)
             return self._viewer.add_image(data=img, name=img_file.name)
-        return self._viewer.open(str(img_file), layer_type="image")
+        return self._viewer.open(str(img_file), plugin=None, layer_type="image")
 
     def _create_points_layer(self) -> Points:
         points_layer = self._viewer.add_points(
