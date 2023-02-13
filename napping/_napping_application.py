@@ -37,13 +37,16 @@ class NappingApplication:
         return_code = NappingApplication.RESTART_RETURN_CODE
         while return_code == NappingApplication.RESTART_RETURN_CODE:
             self._current_app = app or QApplication([])
+            assert self._navigator.current_source_img_file is not None
             self._current_source_viewer = self._create_source_viewer(
                 self._navigator.current_source_img_file
             )
+            assert self._navigator.current_target_img_file is not None
             self._current_target_viewer = self._create_target_viewer(
                 self._navigator.current_target_img_file
             )
             self._current_widget = self._create_widget()
+            assert self._navigator.current_control_points_file is not None
             if self._navigator.current_control_points_file.is_file():
                 current_control_points = pd.read_csv(
                     self._navigator.current_control_points_file,
@@ -79,6 +82,7 @@ class NappingApplication:
             app = QApplication([])
         dialog = self._create_dialog()
         if dialog.exec() == NappingDialog.DialogCode.Accepted:
+            assert dialog.transform_type is not None
             self._transform_type = {
                 NappingDialog.TransformType.EUCLIDEAN: EuclideanTransform,
                 NappingDialog.TransformType.SIMILARITY: SimilarityTransform,
@@ -93,6 +97,10 @@ class NappingApplication:
             else:
                 self._post_transform = None
             if dialog.selection_mode == NappingDialog.SelectionMode.FILE:
+                assert dialog.source_img_path is not None
+                assert dialog.target_img_path is not None
+                assert dialog.control_points_path is not None
+                assert dialog.joint_transform_path is not None
                 self._navigator.load_file(
                     dialog.source_img_path,
                     dialog.target_img_path,
@@ -102,6 +110,11 @@ class NappingApplication:
                     transf_coords_file=dialog.transf_coords_path,
                 )
             elif dialog.selection_mode == NappingDialog.SelectionMode.DIR:
+                assert dialog.matching_strategy is not None
+                assert dialog.source_img_path is not None
+                assert dialog.target_img_path is not None
+                assert dialog.control_points_path is not None
+                assert dialog.joint_transform_path is not None
                 dialog.control_points_path.mkdir(exist_ok=True)
                 dialog.joint_transform_path.mkdir(exist_ok=True)
                 if dialog.transf_coords_path is not None:
@@ -133,6 +146,10 @@ class NappingApplication:
             self.exec(app=app)
 
     def restart(self) -> None:
+        assert self._current_app is not None
+        assert self._current_widget is not None
+        assert self._current_source_viewer is not None
+        assert self._current_target_viewer is not None
         self._current_source_viewer.close()
         self._current_target_viewer.close()
         self._current_widget.close()
@@ -179,6 +196,8 @@ class NappingApplication:
     def set_current_control_points(
         self, current_control_points: Optional[pd.DataFrame]
     ) -> None:
+        assert self._current_source_viewer is not None
+        assert self._current_target_viewer is not None
         with self._block_write():
             if current_control_points is not None:
                 current_source_control_points = current_control_points.loc[
@@ -196,8 +215,8 @@ class NappingApplication:
                     current_target_control_points
                 )
             else:
-                self.current_source_viewer.set_control_points(None)
-                self.current_target_viewer.set_control_points(None)
+                self._current_source_viewer.set_control_points(None)
+                self._current_target_viewer.set_control_points(None)
 
     def get_current_control_point_residuals(
         self,
@@ -205,6 +224,7 @@ class NappingApplication:
         if self._current_transform is not None:
             current_control_points = self.get_current_control_points()
             if current_control_points is not None and not current_control_points.empty:
+                assert self._transform_type is not None
                 tf = self._transform_type(self._current_transform)
                 return tf.residuals(
                     current_control_points.loc[:, ["x_source", "y_source"]].to_numpy(),
@@ -229,6 +249,7 @@ class NappingApplication:
     ) -> None:
         current_control_points = self.get_current_control_points()
         if not self._write_blocked and current_control_points is not None:
+            assert self._navigator.current_control_points_file is not None
             with self._navigator.current_control_points_file.open(
                 mode="wb", buffering=0
             ) as f:
@@ -242,16 +263,20 @@ class NappingApplication:
             )
         self._update_current_transf_coords()
         if not self._write_blocked and self._current_transf_coords is not None:
+            assert self._navigator.current_transf_coords_file is not None
             with self._navigator.current_transf_coords_file.open(
                 mode="wb", buffering=0
             ) as f:
                 self._current_transf_coords.to_csv(f, mode="wb", index=False)
+        assert self._current_widget is not None
         self._current_widget.refresh()
 
     def _update_current_transform(self) -> None:
         self._current_transform = None
         current_control_points = self.get_current_control_points()
+        assert current_control_points is not None
         if current_control_points.shape[0] >= 3:
+            assert self._transform_type is not None
             tf = self._transform_type()
             if tf.estimate(
                 current_control_points.loc[:, ["x_source", "y_source"]].to_numpy(),
@@ -274,7 +299,7 @@ class NappingApplication:
             ).T[:, :2]
 
     @contextmanager
-    def _block_write(self) -> None:
+    def _block_write(self):
         self._write_blocked = True
         yield
         self._write_blocked = False
