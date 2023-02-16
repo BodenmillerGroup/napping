@@ -24,9 +24,9 @@ Run `napping` for control point mapping and coordinate transformation
 
 ## Authors
 
-Created by Jonas Windhager [jonas@windhager.io](mailto:jonas@windhager.io)
+Created and maintained by [Jonas Windhager](mailto:jonas@windhager.io) until February 2023.
 
-Maintained by Milad Adibi [milad.adibi@uzh.ch](mailto:milad.adibi@uzh.ch)
+Maintained by [Milad Adibi](mailto:milad.adibi@uzh.ch) from February 2023.
 
 ## Contributing
 
