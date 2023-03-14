@@ -80,6 +80,8 @@ class NappingNavigator:
                 self._source_coords_files,
             ) = self._match_filename(source_img_dir, target_img_dir, source_coords_dir)
         elif matching_strategy == NappingNavigator.MatchingStrategy.REGEX:
+            assert source_regex is not None
+            assert target_regex is not None
             (
                 self._source_img_files,
                 self._target_img_files,
@@ -122,7 +124,7 @@ class NappingNavigator:
         source_dir: Path,
         target_dir: Path,
         source_coords_dir: Optional[Path],
-    ) -> Tuple[List[Path], List[Path], List[Path]]:
+    ) -> Tuple[List[Path], List[Path], Optional[List[Path]]]:
         source_files = sorted(
             (f for f in source_dir.glob("*") if f.is_file()),
             key=lambda f: f.stem,
@@ -155,7 +157,7 @@ class NappingNavigator:
         source_dir: Path,
         target_dir: Path,
         soruce_coords_dir: Optional[Path],
-    ) -> Tuple[List[Path], List[Path], List[Path]]:
+    ) -> Tuple[List[Path], List[Path], Optional[List[Path]]]:
         def match_target(target_file: Path, source_file: Path):
             return target_file.stem == source_file.stem
 
@@ -179,10 +181,9 @@ class NappingNavigator:
         target_regex: str,
         source_coords_dir: Optional[Path],
         source_coords_regex: Optional[str],
-    ) -> Tuple[List[Path], List[Path], List[Path]]:
+    ) -> Tuple[List[Path], List[Path], Optional[List[Path]]]:
         source_pattern = re.compile(source_regex)
         target_pattern = re.compile(target_regex)
-        source_coords_pattern = re.compile(source_coords_regex)
 
         def match_target(target_file: Path, source_file: Path):
             target_match = target_pattern.search(target_file.name)
@@ -191,19 +192,28 @@ class NappingNavigator:
                 return target_match.group() == source_match.group()
             return False
 
-        def match_source_coords(source_coords_file: Path, source_file: Path):
-            source_coords_match = source_coords_pattern.search(source_coords_file.name)
-            source_match = source_pattern.search(source_file.name)
-            if source_coords_match is not None and source_match is not None:
-                return source_coords_match.group() == source_match.group()
-            return False
+        if source_coords_dir is not None and source_coords_regex is not None:
+            source_coords_pattern = re.compile(source_coords_regex)
+
+            def match_source_coords(source_coords_file: Path, source_file: Path):
+                source_coords_match = source_coords_pattern.search(
+                    source_coords_file.name
+                )
+                source_match = source_pattern.search(source_file.name)
+                if source_coords_match is not None and source_match is not None:
+                    return source_coords_match.group() == source_match.group()
+                return False
+
+            match_source_coords_func = match_source_coords
+        else:
+            match_source_coords_func = None
 
         return cls._match(
             source_dir,
             target_dir,
             match_target,
             source_coords_dir,
-            match_source_coords,
+            match_source_coords_func,
         )
 
     @staticmethod
@@ -213,7 +223,7 @@ class NappingNavigator:
         target_criterion: Callable[[Path, Path], bool],
         source_coords_dir: Optional[Path],
         source_coords_criterion: Optional[Callable[[Path, Path], bool]],
-    ) -> Tuple[List[Path], List[Path], List[Path]]:
+    ) -> Tuple[List[Path], List[Path], Optional[List[Path]]]:
         source_files = [f for f in source_dir.glob("*") if f.is_file()]
         target_files = [f for f in target_dir.glob("*") if f.is_file()]
         if source_coords_dir is not None:
@@ -227,7 +237,7 @@ class NappingNavigator:
         matched_source_files = []
         matched_target_files = []
         if source_coords_files is not None:
-            matched_source_coords_files = []
+            matched_source_coords_files: Optional[List[Path]] = []
         else:
             matched_source_coords_files = None
         for matched_source_file in source_files:
@@ -242,6 +252,7 @@ class NappingNavigator:
             if matched_target_file is None:
                 continue
             if source_coords_files is not None:
+                assert source_coords_criterion is not None
                 matched_source_coords_file = next(
                     (
                         source_coords_file
@@ -259,6 +270,7 @@ class NappingNavigator:
             matched_source_files.append(matched_source_file)
             matched_target_files.append(matched_target_file)
             if matched_source_coords_file is not None:
+                assert matched_source_coords_files is not None
                 matched_source_coords_files.append(matched_source_coords_file)
         return (
             matched_source_files,
@@ -306,24 +318,28 @@ class NappingNavigator:
     @property
     def current_source_img_file(self) -> Optional[Path]:
         if self._current_index is not None:
+            assert self._source_img_files is not None
             return self._source_img_files[self._current_index]
         return None
 
     @property
     def current_target_img_file(self) -> Optional[Path]:
         if self._current_index is not None:
+            assert self._target_img_files is not None
             return self._target_img_files[self._current_index]
         return None
 
     @property
     def current_control_points_file(self) -> Optional[Path]:
         if self._current_index is not None:
+            assert self._control_points_files is not None
             return self._control_points_files[self._current_index]
         return None
 
     @property
     def current_joint_transform_file(self) -> Optional[Path]:
         if self._current_index is not None:
+            assert self._joint_transform_files is not None
             return self._joint_transform_files[self._current_index]
         return None
 

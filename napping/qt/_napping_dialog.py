@@ -377,10 +377,10 @@ class NappingDialog(QDialog):
                 control_points_default_suffix = ".csv"
                 transform_name_filter = "Numpy files (*.npy)"
                 transform_default_suffix = ".npy"
-                source_coords_name_filter = (
-                    transf_coords_name_filter
-                ) = "CSV files (*.csv)"
-                source_coords_default_suffix = transf_coords_default_suffix = ".csv"
+                source_coords_name_filter = "CSV files (*.csv)"
+                transf_coords_name_filter = "CSV files (*.csv)"
+                source_coords_default_suffix = ".csv"
+                transf_coords_default_suffix = ".csv"
                 show_dirs_only = False
             else:
                 any_file_mode = QFileDialog.FileMode.Directory
@@ -389,8 +389,10 @@ class NappingDialog(QDialog):
                 control_points_default_suffix = None
                 transform_name_filter = None
                 transform_default_suffix = None
-                source_coords_name_filter = transf_coords_name_filter = None
-                source_coords_default_suffix = transf_coords_default_suffix = None
+                source_coords_name_filter = None
+                transf_coords_name_filter = None
+                source_coords_default_suffix = None
+                transf_coords_default_suffix = None
                 show_dirs_only = True
 
             self._source_img_path_edit.file_dialog.setFileMode(existing_file_mode)
@@ -558,6 +560,9 @@ class NappingDialog(QDialog):
         return True
 
     def _on_button_box_accepted(self) -> None:
+        assert self.selection_mode is not None
+        assert self.transform_type is not None
+        assert self.matching_strategy is not None
         self._settings.setValue(self.SELECTION_MODE_SETTING, self.selection_mode.value)
         self._settings.setValue(self.SOURCE_IMG_PATH_SETTING, str(self.source_img_path))
         self._settings.setValue(self.SOURCE_IMG_REGEX_SETTING, self.source_regex)

@@ -75,7 +75,7 @@ class NappingViewer:
         points_layer.events.data.connect(self._on_points_layer_data_changed)
         return points_layer
 
-    def _on_points_layer_mouse_drag(self, layer: Points, event) -> None:
+    def _on_points_layer_mouse_drag(self, layer: Points, event):
         # https://github.com/napari/napari/issues/2259
         if layer.mode == "add":
             layer.current_properties["id"][0] = (
